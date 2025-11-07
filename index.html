@@ -26,12 +26,12 @@
     button{background:var(--accent)} button.ghost{background:transparent}
     .list{display:flex;flex-direction:column;gap:8px}
     .player{position:relative;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px;border:1px dashed var(--chipb);border-radius:12px;background:var(--chip)}
-    .handle{touch-action:none;cursor:grab;font-weight:900;font-size:20px;color:var(--accent-2);padding:0 6px}
+    .handle{touch-action:none;cursor:grab;font-weight:900;font-size:20px;color:#f5d02e;padding:0 6px}
     .tabs{position:fixed;left:0;right:0;bottom:0;display:flex;border-top:2px solid var(--accent-2);background:var(--panel)}
     .tab{flex:1;text-align:center;padding:10px;color:#cbd5e1;text-decoration:none}
     .tab.active{background:#0a1325;color:#fff}
     .tbl-wrap{overflow-x:auto}
-    .tbl{width:100%;border-collapse:collapse;min-width:600px}
+    .tbl{width:100%;border-collapse:collapse;min-width:700px}
     .tbl th,.tbl td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
     .lineup{display:flex;gap:8px;flex-wrap:wrap}
     .chip{background:var(--chip);border:1px solid var(--chipb);padding:6px 10px;border-radius:999px;cursor:pointer}
@@ -152,7 +152,7 @@ if ('serviceWorker' in navigator) {
 }
 
 /* Helpers */
-const storeKey = 'wisselplanner_state_mobile_team_v2_3_13';
+const storeKey = 'wisselplanner_state_mobile_team_v2_3_14';
 const RANK_ORDER = ["Dani","Twan","Sydney","Ryan","Finn","Diede","Milan","Wouter"];
 function $(id){return document.getElementById(id)}
 function pad2(n){return String(n).padStart(2,'0')}
@@ -334,6 +334,7 @@ function pickField(need,avail,minutes,targetAvg){
   return chosen;
 }
 function repairPositions(field,bench,keeper){
+  // laagste prioriteit: doe een zachte poging
   const need=['DEF','MID','ATT'];
   const present=state.players.filter(p=>p.present&&p.id!==keeper.id);
   const exists={}; present.forEach(p=>{ if(p.pos!=='ALL') exists[p.pos]=true; });
@@ -347,10 +348,10 @@ function repairPositions(field,bench,keeper){
     }
   }
 }
-// rank op basis van huidige quality
+// rang volgens huidige quality
 function rankIndex(p){ const arr=[...state.players].sort((a,b)=>b.quality-a.quality); const i=arr.findIndex(x=>x.id===p.id); return (i<0)?999:i+1; }
-// Topper-scheiding op de bank
-function enforceBenchSeparation(field, bench, lastBench, slotIndex){
+// spreiding toppers op bank (kwaliteitslaag)
+function enforceBenchSeparation(field, bench, lastBench, slotIndex, cooldownSlots){
   if(bench.length<2) return {field,bench};
   for(let i=0;i<bench.length;i++){
     for(let j=i+1;j<bench.length;j++){
@@ -358,7 +359,7 @@ function enforceBenchSeparation(field, bench, lastBench, slotIndex){
       if(Math.abs(ri-rj)<2){
         const better=(bench[i].quality>=bench[j].quality)?bench[i]:bench[j];
         const swap=field.slice().sort((a,b)=>a.quality-b.quality)
-          .find(f=>!lastBench.has(f.id)||(slotIndex-lastBench.get(f.id)>=BENCH_COOLDOWN));
+          .find(f=>!lastBench.has(f.id)||(slotIndex-lastBench.get(f.id)>=cooldownSlots));
         if(swap){
           field=field.filter(x=>x.id!==swap.id);
           bench=bench.filter(x=>x.id!==better.id);
@@ -370,7 +371,8 @@ function enforceBenchSeparation(field, bench, lastBench, slotIndex){
   return {field,bench};
 }
 
-const BENCH_COOLDOWN=3;
+const MIN_BENCH_GAP = 2;                 // min. 2 slots ertussen
+const COOLDOWN_SLOTS = MIN_BENCH_GAP+1;  // earliest herbench = vorige bench + 3
 let lastSchedule=[],curIndex=0;
 
 function generateSchedule(fromIndex=0,seedMinutes=null){
@@ -400,67 +402,47 @@ function generateSchedule(fromIndex=0,seedMinutes=null){
     const key=(state.keeperCount===1)?0:(state.keeperCount===2?(seg.q<state.quarters/2?0:1):seg.q);
     const keeper=keeperKey.get(key);
 
-    // --- opbouw field/bench ---
+    // 1) initiele keuze op fairness/kwaliteit
     let field=pickField(state.formation-1, present.filter(p=>p.id!==keeper.id), minutes, targetAvg);
     let bench=present.filter(p=>p.id!==keeper.id && !field.find(f=>f.id===p.id));
 
-    // safety
-    field=field.filter(p=>p.id!==keeper.id);
-    bench=bench.filter(p=>p.id!==keeper.id);
-
-    // aantallen forceren
-    const WANT_FIELD=state.formation-1;
-    const WANT_BENCH=present.length - state.formation;
-
-    while(field.length>WANT_FIELD){
-      const worst=field.slice().sort((a,b)=>a.quality-b.quality)[0];
-      field=field.filter(x=>x.id!==worst.id); bench.push(worst);
-    }
-    while(field.length<WANT_FIELD && bench.length){
-      const best=bench.slice().sort((a,b)=>b.quality-a.quality)[0];
-      bench=bench.filter(x=>x.id!==best.id); field.push(best);
-    }
-    while(bench.length>WANT_BENCH){
-      const bestB=bench.slice().sort((a,b)=>b.quality-a.quality)[0];
-      const worstF=field.slice().sort((a,b)=>a.quality-b.quality)[0];
-      bench=bench.filter(x=>x.id!==bestB.id);
-      field=field.filter(x=>x.id!==worstF.id);
-      field.push(bestB); bench.push(worstF);
-    }
-    while(bench.length<WANT_BENCH){
-      const worstF=field.slice().sort((a,b)=>a.quality-b.quality)[0];
-      field=field.filter(x=>x.id!==worstF.id); bench.push(worstF);
-    }
-
-    // cooldown
-    const bad = bench.filter(p => lastBench.has(p.id) && (i - lastBench.get(p.id) < BENCH_COOLDOWN));
-    if(bad.length){
-      for(const b of bad){
-        const sw = field.find(f => !lastBench.has(f.id) || (i - lastBench.get(f.id) >= BENCH_COOLDOWN));
-        if(sw){
-          field=field.filter(x=>x.id!==sw.id);
-          bench=bench.filter(x=>x.id!==b.id);
-          field.push(b); bench.push(sw);
+    // 2) HARD CONSTRAINT: cooldown afdwingen (min. 2 slots tussen bank)
+    const violators = bench.filter(p => lastBench.has(p.id) && (i - lastBench.get(p.id) < COOLDOWN_SLOTS));
+    if(violators.length){
+      for(const b of violators){
+        // ruil met veldspeler die cooldown wél haalt (kies zwakste/hoogste minuten)
+        const swap = field.slice().sort((a,b2)=>a.quality-b2.quality || (minutes.get(b2.id)||0)-(minutes.get(a.id)||0))
+          .find(f => !lastBench.has(f.id) || (i - lastBench.get(f.id) >= COOLDOWN_SLOTS));
+        if(swap){
+          field = field.filter(x=>x.id!==swap.id);
+          bench = bench.filter(x=>x.id!==b.id);
+          field.push(b);
+          bench.push(swap);
         }
       }
     }
 
-    // toppers niet tegelijk op bank
-    ({field,bench}=enforceBenchSeparation(field,bench,lastBench,i));
+    // 3) Kwaliteitslaag: toppers niet samen op bank (zonder cooldown te breken)
+    ({field,bench} = enforceBenchSeparation(field,bench,lastBench,i,COOLDOWN_SLOTS));
 
-    // slots definitief
+    // 4) Safety + aantallen forceren
+    const WANT_FIELD=state.formation-1;
+    const WANT_BENCH=present.length - state.formation;
+    field=field.filter(p=>p.id!==keeper.id);
+    bench=bench.filter(p=>p.id!==keeper.id);
+
+    while(field.length>WANT_FIELD){ const worst=field.slice().sort((a,b)=>a.quality-b.quality)[0]; field=field.filter(x=>x.id!==worst.id); bench.push(worst); }
+    while(field.length<WANT_FIELD && bench.length){ const best=bench.slice().sort((a,b)=>b.quality-a.quality)[0]; bench=bench.filter(x=>x.id!==best.id); field.push(best); }
+    while(bench.length>WANT_BENCH){ const bestB=bench.slice().sort((a,b)=>b.quality-a.quality)[0]; const worstF=field.slice().sort((a,b)=>a.quality-b.quality)[0]; bench=bench.filter(x=>x.id!==bestB.id); field=field.filter(x=>x.id!==worstF.id); field.push(bestB); bench.push(worstF); }
+    while(bench.length<WANT_BENCH){ const worstF=field.slice().sort((a,b)=>a.quality-b.quality)[0]; field=field.filter(x=>x.id!==worstF.id); bench.push(worstF); }
+
+    // 5) Posities (laagste prioriteit; zachte poging)
     repairPositions(field,bench,keeper);
 
-    // minuten bijhouden
+    // minuten en bench-telling
     minutes.set(keeper.id,(minutes.get(keeper.id)||0)+seg.duration);
     field.forEach(p=> minutes.set(p.id,(minutes.get(p.id)||0)+seg.duration));
     bench.forEach(p=> lastBench.set(p.id,i));
-
-    // sanity (dev):
-    // console.assert(!field.some(p=>p.id===keeper.id),'Keeper in veld');
-    // console.assert(!bench.some(p=>p.id===keeper.id),'Keeper in bank');
-    // console.assert(field.length===WANT_FIELD,'Veld-aantal');
-    // console.assert(bench.length===WANT_BENCH,'Bank-aantal');
 
     sched.push({...seg,keeper,field,bench});
   }
