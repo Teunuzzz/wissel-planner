@@ -4,61 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1422">
-<link rel="manifest" href="manifest.webmanifest">
 <title>Wisselplanner</title>
 <style>
-  :root{
-    --bg:#0b1220;--panel:#0f172a;--border:#1f2937;--text:#e5e7eb;--muted:#9ca3af;
-    --accent:#2b67f6;--danger:#ef4444;--ok:#16a34a;--warn:#f59e0b;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
-  .container{max-width:860px;margin:0 auto;padding:12px}
-  h1{font-size:20px;margin:8px 0 12px}
-  h2{font-size:18px;margin:8px 0 10px}
-  .tabs{display:flex;gap:6px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:10;flex-wrap:wrap}
-  .tab{flex:1;min-width:0}
-  .tab button{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-weight:600}
-  .tab button.active{background:var(--accent);border-color:transparent}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;margin:8px 0}
-  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .btn{padding:12px 14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
-  .btn.secondary{background:#1f2937}
-  .btn.danger{background:var(--danger)}
-  .btn.small{padding:8px 10px;font-weight:600}
-  .pill{padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0a1322}
-  input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1324;color:var(--text)}
-  label{font-size:13px;color:var(--muted)}
-  .grid{display:grid;grid-template-columns:1fr;gap:8px}
-  @media(min-width:560px){.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}}
-  .list{display:flex;flex-direction:column;gap:8px}
-  .player{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#0b1324}
-  .player .drag{cursor:grab;font-size:18px;opacity:.8}
-  .player .name{flex:1;min-width:0}
-  .player .pos{width:130px}
-  .player .present{width:36px;text-align:center}
-  .player .del{width:40px;text-align:center}
-  .hidden{display:none}
-  .table{width:100%;border-collapse:collapse}
-  .table th,.table td{padding:10px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
-  .big{font-size:44px;font-weight:800;letter-spacing:1px}
-  .timer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .progress{height:10px;border-radius:999px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
-  .progress>div{height:100%;background:var(--accent);width:0%}
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
-  .overlay .panel{max-width:560px;width:100%;background:#0f172a;border:1px solid var(--border);border-radius:16px;padding:16px;text-align:center}
-  .swaplist{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0}
-  .swaplist .col{flex:1 1 220px;background:#0b1324;border:1px solid var(--border);border-radius:12px;padding:12px}
-  .swaplist h3{margin:0 0 8px;font-size:16px}
-  .muted{color:var(--muted)}
-  .no-scroll-x{overflow-x:hidden}
-  .bar{height:8px;border-radius:8px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
-  .bar>div{height:100%;background:#16a34a;width:0%}
-  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;}
+:root{--bg:#0b1220;--panel:#0f172a;--border:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--accent:#2b67f6;--danger:#ef4444;--ok:#16a34a}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Arial}
+.container{max-width:900px;margin:0 auto;padding:12px}
+.tabs{display:flex;gap:6px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:10}
+.tab{flex:1}.tab button{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0f172a;color:var(--text);font-weight:700;cursor:pointer}
+.tab button.active{background:var(--accent);border-color:transparent}
+.card{background:#0f172a;border:1px solid var(--border);border-radius:14px;padding:12px;margin:8px 0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:12px 14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+.btn.secondary{background:#1f2937}.btn.danger{background:var(--danger)}.btn.small{padding:8px 10px}
+.pill{padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0a1322}
+input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1324;color:var(--text)}
+.grid2{display:grid;grid-template-columns:1fr;gap:8px}@media(min-width:560px){.grid2{grid-template-columns:1fr 1fr}}
+.list{display:flex;flex-direction:column;gap:8px}
+.player{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#0b1324}
+.player .drag{cursor:grab}.player .name{flex:1}.player .pos{width:140px}.player .present{width:36px;text-align:center}.player .del{width:40px;text-align:center}
+.hidden{display:none}
+.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
+.timer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.big{font-size:44px;font-weight:800}
+.progress{height:10px;border-radius:999px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
+.progress>div{height:100%;background:var(--accent);width:0%}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.overlay .panel{max-width:560px;width:100%;background:#0f172a;border:1px solid var(--border);border-radius:16px;padding:16px;text-align:center}
+.swaplist{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+.swaplist .col{flex:1 1 220px;background:#0b1324;border:1px solid var(--border);border-radius:12px;padding:12px}
+.namechip{padding:10px;border:1px solid var(--border);border-radius:10px;margin:6px 0;background:#0a1322}
+.bar{height:8px;border-radius:8px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
+.bar>div{height:100%;background:#16a34a;width:0%}
 </style>
 </head>
-<body class="no-scroll-x">
+<body>
 <div class="container">
   <h1>Wisselplanner</h1>
   <div class="tabs">
@@ -71,9 +49,9 @@
   <section id="tab-setup" class="card">
     <h2>Team &amp; spelers</h2>
     <div class="grid2 card">
-      <div><label>Teamnaam</label><input id="teamName" placeholder="Teamnaam"></div>
+      <div><label>Teamnaam</label><input id="teamName" placeholder="Teamnaam" value="De Esch O9"></div>
       <div><label>Formatie (aantal veldspelers)</label><select id="formation"><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option></select></div>
-      <div><label>Keepers per wedstrijd</label><select id="keepersMode"><option value="1">1 keeper (hele wedstrijd)</option><option value="2">2 keepers (helften)</option><option value="4">4 keepers (kwarten)</option></select></div>
+      <div><label>Keepers per wedstrijd</label><select id="keepersMode"><option value="1">1 keeper (hele wedstrijd)</option><option value="2">2 keepers (helften)</option><option value="4" selected>4 keepers (kwarten)</option></select></div>
       <div id="keeperAssignBox"><label>Keeper-keuze (volgens modus)</label><div class="row" id="keeperAssignRow"></div></div>
     </div>
 
@@ -93,6 +71,8 @@
       <div class="big" id="clock">10:00</div>
       <div class="pill" id="lblQuarter">Kwart 1 / 4</div>
       <div class="pill" id="lblView">Bekijken: 1 / 4</div>
+      <button class="btn" id="btnStart">▶ Start</button>
+      <button class="btn secondary" id="btnPause">⏸︎ Pauze</button>
     </div>
     <div class="row" id="quarterNavRow">
       <button class="btn secondary" id="btnPrevView">⏮ Vorig kwart</button>
@@ -101,16 +81,16 @@
     </div>
     <div class="progress"><div id="progressBar"></div></div>
     <div class="card"><div class="row"><div class="pill"><strong>Keeper:</strong> <span id="liveKeeper">—</span></div><div class="pill"><strong>Veld:</strong> <span id="liveField">—</span></div><div class="pill"><strong>Bank:</strong> <span id="liveBench">—</span></div></div></div>
-    <table class="table" id="scheduleTable"><thead><tr><th>Slot</th><th>Tijd</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
+    <table class="table" id="scheduleTable"><thead><tr><th>Q•Slot</th><th>Tijd</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section id="tab-quick" class="card hidden">
     <h2>Snelle wijzigingen</h2>
-    <div class="card"><div class="row"><div class="grid" style="flex:1;min-width:220px"><label>Actieve spelers</label><div id="quickActive" class="list"></div></div></div></div>
-    <div class="grid2">
-      <div><label>Keeper wijzigen (volgens modus)</label><div id="quickKeeperAssign" class="row"></div></div>
+    <div class="card"><div class="row"><div class="grid2" style="width:100%">
+      <div><label>Actieve spelers</label><div id="quickActive" class="list"></div></div>
       <div><label>Formatie aanpassen</label><select id="quickFormation"></select></div>
-    </div>
+    </div></div></div>
+    <div><label>Keeper wijzigen (volgens modus)</label><div id="quickKeeperAssign" class="row"></div></div>
     <div class="row" style="margin-top:8px"><button class="btn" id="btnQuickRecalc">Herberekenen</button><button class="btn secondary" id="btnQuickToLive">Naar Live</button></div>
   </section>
 
@@ -118,7 +98,7 @@
     <h2>Verdeling</h2>
     <div class="card">
       <h3 style="margin-top:0">Geplande wissels (alle kwarten)</h3>
-      <table class="table mono" id="distSwaps"><thead><tr><th>Kwart</th><th>Slot</th><th>Uit</th><th>In</th></tr></thead><tbody></tbody></table>
+      <table class="table" id="distSwaps"><thead><tr><th>Q•Slot</th><th>Tijd</th><th>Keeper</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
     </div>
     <div class="card">
       <h3 style="margin-top:0">Geplande speelminuten per speler</h3>
@@ -127,234 +107,203 @@
   </section>
 </div>
 
+<div class="overlay" id="swapOverlay">
+  <div class="panel">
+    <h2>Wisselmoment</h2>
+    <div class="swaplist">
+      <div class="col"><h3>Uit</h3><div id="swapOut"></div></div>
+      <div class="col"><h3>In</h3><div id="swapIn"></div></div>
+    </div>
+    <button class="btn" id="btnDidSwap">Gewisseld</button>
+  </div>
+</div>
+
 <script>
-const storeKey='wisselplanner.v11';
+const storeKey='wisselplanner.v13';
 const POS=['Aanvaller','Middenvelder','Verdediger'];
 const DEFAULT_ORDER=['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
-
-let state={team:'De Esch O9',formation:5,players:[],keepersMode:1,keeperByQuarter:[],q:1,viewQ:1,schedule:[],plannedMinutes:{}};
+let state={team:'De Esch O9',formation:5,players:[],keepersMode:4,keeperByQuarter:[],q:1,viewQ:1,schedule:[],plannedMinutes:{},running:false,tStart:null,elapsedMs:0,quarterMs:600000,swapAtMs:300000,swappedThisQuarter:false};
 
 function uid(){return Math.random().toString(36).slice(2,9)}
 function save(){localStorage.setItem(storeKey,JSON.stringify(state))}
-function load(){const raw=localStorage.getItem(storeKey); if(raw){try{state=JSON.parse(raw);}catch(e){}}}
+function load(){const raw=localStorage.getItem(storeKey); if(raw){try{state=JSON.parse(raw)}catch(e){}}}
 function ensureDefaults(){
-  if(!state.players || !Array.isArray(state.players) || state.players.length===0){
-    state.players = DEFAULT_ORDER.map((n,i)=>({id:uid(),name: n,pos: POS[i%3],present:true,minutes:0,benchCd:0}));
-  }
-  if(!state.keeperByQuarter || state.keeperByQuarter.length!==4){
-    const first = state.players[0]?.id || null;
-    state.keeperByQuarter = [first,first,first,first];
+  if(!state.players||!state.players.length){state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name:n,pos:POS[i%3],present:true,benchCd:0}))}
+  if(!state.keeperByQuarter||state.keeperByQuarter.length!==4){
+    // default 4 keepers Q1..Q4 different if kan
+    const ps=state.players.map(p=>p.id);
+    state.keeperByQuarter=[ps[0]||null,ps[1]||ps[0]||null,ps[2]||ps[0]||null,ps[3]||ps[0]||null];
   }
   if(!state.q) state.q=1;
   if(!state.viewQ) state.viewQ=1;
 }
-
 function presentPlayers(){return state.players.filter(p=>p.present)}
 function nameBy(id){const p=state.players.find(x=>x.id===id); return p?p.name:'—'}
 function playerBy(id){return state.players.find(x=>x.id===id)}
-function getKeeperForQuarter(q){return state.keeperByQuarter[q-1]}
+function keeperFor(q){return state.keeperByQuarter[q-1]}
 
-function rebuildKeeperAssignRow(containerId,prefix){
+function keeperAssignUI(containerId,prefix){
   const row=document.getElementById(containerId); row.innerHTML='';
   const ps=presentPlayers(); const opts=ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   if(state.keepersMode===1){
-    const id=`${prefix}-all`; row.innerHTML=`<select id="${id}">${opts}</select>`;
-    document.getElementById(id).value=state.keeperByQuarter[0]||ps[0]?.id||'';
+    const id=`${prefix}-all`; row.innerHTML=`<select id="${id}">${opts}</select>`; (document.getElementById(id)||{}).value=state.keeperByQuarter[0];
   }else if(state.keepersMode===2){
-    const a=`${prefix}-h1`, b=`${prefix}-h2`;
-    row.innerHTML=`<div class="grid2" style="width:100%"><div><label>1e helft</label><select id="${a}">${opts}</select></div><div><label>2e helft</label><select id="${b}">${opts}</select></div></div>`;
-    document.getElementById(a).value=state.keeperByQuarter[0]||ps[0]?.id||'';
-    document.getElementById(b).value=state.keeperByQuarter[2]||ps[1]?.id||'';
+    row.innerHTML=`<div class="grid2" style="width:100%">
+      <div><label>1e helft</label><select id="${prefix}-h1">${opts}</select></div>
+      <div><label>2e helft</label><select id="${prefix}-h2">${opts}</select></div>
+    </div>`;
+    document.getElementById(`${prefix}-h1`).value=state.keeperByQuarter[0];
+    document.getElementById(`${prefix}-h2`).value=state.keeperByQuarter[2]||ps[1]?.id;
   }else{
     const ids=[`${prefix}-q1`,`${prefix}-q2`,`${prefix}-q3`,`${prefix}-q4`];
     row.innerHTML=`<div class="grid2" style="width:100%">${ids.map((id,i)=>`<div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>`).join('')}</div>`;
-    ids.forEach((id,i)=>{document.getElementById(id).value=state.keeperByQuarter[i]||ps[i%ps.length]?.id||'';});
+    ids.forEach((id,i)=>{document.getElementById(id).value=state.keeperByQuarter[i]});
   }
 }
-
 function readKeeperAssign(prefix){
-  const ps=presentPlayers();
-  const val = id => {const el=document.getElementById(id); return el?el.value:(ps[0]?.id||null)};
+  const ps=presentPlayers(); const val=id=>{const el=document.getElementById(id); return el?el.value:(ps[0]?.id||null)};
   if(state.keepersMode===1){const k=val(`${prefix}-all`); state.keeperByQuarter=[k,k,k,k];}
-  else if(state.keepersMode===2){const k1=val(`${prefix}-h1`),k2=val(`${prefix}-h2`); state.keeperByQuarter=[k1,k1,k2,k2];}
-  else {state.keeperByQuarter=[val(`${prefix}-q1`),val(`${prefix}-q2`),val(`${prefix}-q3`),val(`${prefix}-q4`)]}
+  else if(state.keepersMode===2){const a=val(`${prefix}-h1`),b=val(`${prefix}-h2`); state.keeperByQuarter=[a,a,b,b];}
+  else{state.keeperByQuarter=[val(`${prefix}-q1`),val(`${prefix}-q2`),val(`${prefix}-q3`),val(`${prefix}-q4`)];}
 }
 
-function canBeBenched(id){return (playerBy(id)?.benchCd||0)<=0}
-function decayCooldown(){state.players.forEach(p=>{if(p.benchCd>0)p.benchCd--;});}
-function markBenched(id){const p=playerBy(id); if(p) p.benchCd=1;}
-
+/* ===== FAIR SCHEDULER with 1-slot cooldown ===== */
 function recomputeAll(){
-  state.schedule=[]; state.plannedMinutes={}; state.players.forEach(p=>state.plannedMinutes[p.id]=0);
-  const cds=state.players.map(p=>({id:p.id,cd:p.benchCd||0}));
+  state.schedule=[]; state.plannedMinutes={};
+  state.players.forEach(p=>{p.benchCd = p.benchCd||0; state.plannedMinutes[p.id]=0;});
+  let prevField = null;
   for(let q=1;q<=4;q++){
-    const k=getKeeperForQuarter(q);
-    const order=state.players.filter(p=>p.present && p.id!==k).map(p=>p.id);
-    let field=order.slice(0,state.formation), bench=order.slice(state.formation);
-    addPlanned([...field,k],5);
-    state.schedule.push({q,slot:1,start:0,end:5,keeper:k,field:[...field],bench:[...bench],out:[],inn:[]});
-    decayCooldown();
-    const out=chooseOut(field), inn=chooseIn(bench);
-    field=field.map(x=>x===out?inn:x); bench=bench.map(x=>x===inn?out:x);
-    markBenched(out);
-    addPlanned([...field,k],5);
-    state.schedule.push({q,slot:2,start:5,end:10,keeper:k,field:[...field],bench:[...bench],out:[out],inn:[inn]});
-    decayCooldown();
+    const k=keeperFor(q);
+    // SLOT 1
+    const s1=buildSlot(q,1,k,prevField);
+    applySlotMinutes(s1);
+    state.schedule.push(s1);
+    // SLOT 2
+    const s2=buildSlot(q,2,k,s1.field);
+    applySlotMinutes(s2);
+    state.schedule.push(s2);
+    // After quarter, previous field is s2.field
+    prevField = s2.field.slice();
   }
-  cds.forEach(({id,cd})=>{const p=playerBy(id); if(p) p.benchCd=cd;});
-  state.viewQ=state.q;
-  save();
+  state.viewQ=state.q; state.swappedThisQuarter=false; state.elapsedMs=0; save();
 }
-function addPlanned(ids,mins){ids.forEach(id=>{state.plannedMinutes[id]=(state.plannedMinutes[id]||0)+mins;});}
-function chooseOut(field){const s=field.slice().sort((a,b)=>state.plannedMinutes[b]-state.plannedMinutes[a]); return s.find(canBeBenched)||field[0]}
-function chooseIn(bench){const s=bench.slice().sort((a,b)=>state.plannedMinutes[a]-state.plannedMinutes[b]); return s[0]||bench[0]}
-function getRow(q,slot){return state.schedule.find(r=>r.q===q && r.slot===slot)}
+function buildSlot(q,slot,k,prevField){
+  const all=presentPlayers().map(p=>p.id).filter(id=>id!==k);
+  // mustPlay: players with benchCd>0 cannot be benched now
+  const mustPlay=all.filter(id=>playerBy(id).benchCd>0);
+  let field=mustPlay.slice();
+  // fill remaining seats with lowest minutes (tie-breaker by original order)
+  const remainingSeats = Math.max(0, state.formation - field.length);
+  const needFrom = all.filter(id=>!field.includes(id)).sort((a,b)=>{
+    const da=state.plannedMinutes[a], db=state.plannedMinutes[b];
+    if(da!==db) return da-db;
+    // tiebreaker: original order in state.players
+    return state.players.findIndex(p=>p.id===a) - state.players.findIndex(p=>p.id===b);
+  }).slice(0,remainingSeats);
+  field = field.concat(needFrom);
+  // bench = others
+  const bench = all.filter(id=>!field.includes(id));
+  // cooldown bookkeeping: those benched now get cd=1 next slot, others 0
+  if(slot===1){/* nothing yet, will be set after minutes */}
+  // compute swap lists compared to prevField (for readability; used in dist and overlay)
+  let out=[],inn=[];
+  if(prevField){
+    out = prevField.filter(id=>!field.includes(id));
+    inn = field.filter(id=>!prevField.includes(id));
+  }
+  return {q,slot,start:slot===1?0:5,end:slot===1?5:10,keeper:k,field:field.slice(),bench:bench.slice(),out,inn};
+}
+function applySlotMinutes(r){
+  // minutes to field + keeper
+  [...r.field, r.keeper].forEach(id=>{state.plannedMinutes[id]=(state.plannedMinutes[id]||0)+5;});
+  // update cooldowns: benched -> 1, field -> 0
+  presentPlayers().forEach(p=>{
+    if(p.id===r.keeper) return;
+    if(r.bench.includes(p.id)) p.benchCd = 1; else p.benchCd = 0;
+  });
+}
 
+/* ===== RENDER ===== */
 function renderPlayersList(){
   const list=document.getElementById('playerList'); list.innerHTML='';
-  let dragId=null;
+  let drag=null;
   state.players.forEach(p=>{
     const el=document.createElement('div'); el.className='player'; el.draggable=true; el.dataset.id=p.id;
-    el.innerHTML=`<div class="drag" title="sleep">☰</div>
-      <div class="name" contenteditable="true" spellcheck="false">${p.name}</div>
-      <select class="pos">${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select>
-      <div class="present"><input type="checkbox" ${p.present?'checked':''}></div>
-      <div class="del"><button class="btn small danger" title="Verwijderen">🗑</button></div>`;
+    el.innerHTML=`<div class="drag">☰</div><div class="name" contenteditable="true">${p.name}</div><select class="pos">${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select><div class="present"><input type="checkbox" ${p.present?'checked':''}></div><div class="del"><button class="btn small danger">🗑</button></div>`;
     el.querySelector('.name').addEventListener('input',e=>{p.name=e.target.textContent.trim(); save();});
     el.querySelector('.pos').addEventListener('change',e=>{p.pos=e.target.value; save();});
     el.querySelector('.present input').addEventListener('change',e=>{p.present=e.target.checked; save();});
     el.querySelector('.del button').addEventListener('click',()=>{state.players=state.players.filter(x=>x.id!==p.id); save(); renderPlayersList();});
-    el.addEventListener('dragstart',()=>{dragId=p.id;});
+    el.addEventListener('dragstart',()=>{drag=p.id;});
     el.addEventListener('dragover',e=>{e.preventDefault(); el.style.outline='2px solid var(--accent)';});
     el.addEventListener('dragleave',()=>{el.style.outline='none'});
-    el.addEventListener('drop',()=>{
-      el.style.outline='none';
-      const from=state.players.findIndex(x=>x.id===dragId);
-      const to=state.players.findIndex(x=>x.id===p.id);
-      if(from>-1&&to>-1&&from!=to){const it=state.players.splice(from,1)[0]; state.players.splice(to,0,it); save(); renderPlayersList();}
-    });
+    el.addEventListener('drop',()=>{el.style.outline='none'; const from=state.players.findIndex(x=>x.id===drag); const to=state.players.findIndex(x=>x.id===p.id); if(from>-1&&to>-1&&from!==to){const it=state.players.splice(from,1)[0]; state.players.splice(to,0,it); save(); renderPlayersList();}});
     list.appendChild(el);
   });
 }
-
 function renderSetup(){
   document.getElementById('teamName').value=state.team;
   document.getElementById('formation').value=String(state.formation);
   document.getElementById('keepersMode').value=String(state.keepersMode);
-  rebuildKeeperAssignRow('keeperAssignRow','keepk');
+  keeperAssignUI('keeperAssignRow','keepk');
   renderPlayersList();
 }
-
 function renderLive(){
   document.getElementById('lblQuarter').textContent=`Kwart ${state.q} / 4`;
   document.getElementById('lblView').textContent=`Bekijken: ${state.viewQ} / 4`;
-  const r1=getRow(state.viewQ,1);
-  document.getElementById('liveKeeper').textContent=nameBy(r1?.keeper)||'—';
-  document.getElementById('liveField').textContent=(r1?.field||[]).map(nameBy).join(', ')||'—';
-  document.getElementById('liveBench').textContent=(r1?.bench||[]).map(nameBy).join(', ')||'—';
+  const r1=state.schedule.find(r=>r.q===state.viewQ && r.slot===1);
+  document.getElementById('liveKeeper').textContent = nameBy(r1?.keeper)||'—';
+  document.getElementById('liveField').textContent = (r1?.field||[]).map(nameBy).join(', ')||'—';
+  document.getElementById('liveBench').textContent = (r1?.bench||[]).map(nameBy).join(', ')||'—';
   const tb=document.querySelector('#scheduleTable tbody'); tb.innerHTML='';
   state.schedule.filter(r=>r.q===state.viewQ).forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`;
+    tr.innerHTML = `<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`;
     tb.appendChild(tr);
   });
+  updateTimerUI();
 }
-
 function renderQuick(){
   const cont=document.getElementById('quickActive'); cont.innerHTML='';
-  state.players.forEach(p=>{
-    const line=document.createElement('div'); line.className='player';
-    line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`;
-    line.querySelector('input').addEventListener('change',e=>{p.present=e.target.checked; save();});
-    cont.appendChild(line);
-  });
+  state.players.forEach(p=>{const line=document.createElement('div'); line.className='player'; line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`; line.querySelector('input').addEventListener('change',e=>{p.present=e.target.checked; save();}); cont.appendChild(line);});
   const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
-  rebuildKeeperAssignRow('quickKeeperAssign','quickk');
+  keeperAssignUI('quickKeeperAssign','quickk');
 }
-
 function renderDist(){
-  const swaps=document.querySelector('#distSwaps tbody'); swaps.innerHTML='';
-  state.schedule.filter(r=>r.slot===2).forEach(r=>{
-    const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.q}</td><td>${r.slot}</td><td>${r.out.map(nameBy).join(', ')||'—'}</td><td>${r.inn.map(nameBy).join(', ')||'—'}</td>`; swaps.appendChild(tr);
-  });
-  const mins=document.querySelector('#distMinutes tbody'); mins.innerHTML='';
-  const rows=state.players.map(p=>({id:p.id,name:p.name,m:state.plannedMinutes[p.id]||0})).sort((a,b)=>b.m-a.m);
-  const total=rows.reduce((s,x)=>s+x.m,0)||1, avg=total/rows.length;
-  rows.forEach(e=>{const tr=document.createElement('tr'); const pct=Math.min(100,(e.m/(avg||1))*100); tr.innerHTML=`<td>${e.name}</td><td>${e.m} min</td><td><div class="bar"><div style="width:${pct}%"></div></div></td>`; mins.appendChild(tr);});
+  const body=document.querySelector('#distSwaps tbody'); body.innerHTML='';
+  state.schedule.forEach(r=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${nameBy(r.keeper)}</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`; body.appendChild(tr);});
+  const mins=document.querySelector('#distMinutes tbody'); mins.innerHTML=''; const rows=state.players.map(p=>({id:p.id,name:p.name,m:state.plannedMinutes[p.id]||0})).sort((a,b)=>b.m-a.m); const total=rows.reduce((s,x)=>s+x.m,0)||1; const avg=total/rows.length; rows.forEach(e=>{const tr=document.createElement('tr'); const pct=Math.min(100,(e.m/(avg||1))*100); tr.innerHTML=`<td>${e.name}</td><td>${e.m} min</td><td><div class="bar"><div style="width:${pct}%"></div></div></td>`; mins.appendChild(tr);});
 }
 
-function recomputeAndGoLive(){
-  recomputeAll(); save();
-  document.querySelector('.tab button[data-tab="live"]').click();
-  state.viewQ=state.q; renderLive();
-}
+/* ===== TIMER + OVERLAY ===== */
+function fmt(ms){const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000));const m=Math.floor(t/60);const s=String(t%60).padStart(2,'0');return `${m}:${s}`}
+function updateTimerUI(){document.getElementById('clock').textContent=fmt(state.elapsedMs); document.getElementById('progressBar').style.width=Math.min(100,(state.elapsedMs/state.quarterMs)*100)+'%';}
+let tick=null;
+function start(){if(state.running) return; state.running=true; const base=Date.now()-state.elapsedMs; tick=setInterval(()=>{state.elapsedMs=Date.now()-base; if(!state.swappedThisQuarter && state.elapsedMs>=state.swapAtMs){showSwap(); state.swappedThisQuarter=true;} if(state.elapsedMs>=state.quarterMs){state.elapsedMs=state.quarterMs; pause();} updateTimerUI();},200);}
+function pause(){state.running=false; if(tick){clearInterval(tick); tick=null;} save();}
+function showSwap(){const r=state.schedule.find(x=>x.q===state.q && x.slot===2); const out=(r?.out||[]).map(nameBy); const inn=(r?.inn||[]).map(nameBy); document.getElementById('swapOut').innerHTML=out.map(n=>`<div class="namechip">${n}</div>`).join('')||'<div class="namechip">—</div>'; document.getElementById('swapIn').innerHTML=inn.map(n=>`<div class="namechip">${n}</div>`).join('')||'<div class="namechip">—</div>'; document.getElementById('swapOverlay').style.display='flex'; try{navigator.vibrate&&navigator.vibrate([120,80,120]);}catch(e){}}
+function hideSwap(){document.getElementById('swapOverlay').style.display='none'; try{navigator.vibrate&&navigator.vibrate([60]);}catch(e){}}
 
-/* --- Events --- */
-document.querySelectorAll('.tab button').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
-    ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-    const id = btn.dataset.tab==='setup'?'tab-setup': btn.dataset.tab==='live'?'tab-live': btn.dataset.tab==='quick'?'tab-quick':'tab-dist';
-    document.getElementById(id).classList.remove('hidden');
-    if(id==='tab-setup') renderSetup();
-    if(id==='tab-live'){ state.viewQ=state.q; renderLive(); }
-    if(id==='tab-quick') renderQuick();
-    if(id==='tab-dist') renderDist();
-  });
-});
+/* ===== NAV/EVENTS ===== */
+document.querySelectorAll('.tab button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id).classList.add('hidden')); const id=btn.dataset.tab==='setup'?'tab-setup':btn.dataset.tab==='live'?'tab-live':btn.dataset.tab==='quick'?'tab-quick':'tab-dist'; document.getElementById(id).classList.remove('hidden'); if(id==='tab-setup') renderSetup(); if(id==='tab-live'){state.viewQ=state.q; renderLive();} if(id==='tab-quick') renderQuick(); if(id==='tab-dist') renderDist();}));
 
-document.getElementById('btnAdd').addEventListener('click',()=>{
-  state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,minutes:0,benchCd:0});
-  save(); renderPlayersList();
-});
-document.getElementById('btnReset').addEventListener('click',()=>{
-  if(confirm('Team resetten naar vaste 8 spelers?')){
-    state.players = DEFAULT_ORDER.map((n,i)=>({id:uid(),name: n,pos: POS[i%3],present:true,minutes:0,benchCd:0}));
-    // reset keepers ook
-    const first=state.players[0].id; state.keeperByQuarter=[first,first,first,first];
-    recomputeAndGoLive();
-  }
-});
-document.getElementById('keepersMode').addEventListener('change',()=>{
-  state.keepersMode = Number(document.getElementById('keepersMode').value)||1;
-  // rebuild keuzes + defaults
-  const ps=presentPlayers(); const first=ps[0]?.id||null;
-  if(state.keepersMode===1){state.keeperByQuarter=[first,first,first,first];}
-  else if(state.keepersMode===2){const second=ps[1]?.id||first; state.keeperByQuarter=[first,first,second,second];}
-  else {state.keeperByQuarter=[ps[0]?.id||first,ps[1]?.id||first,ps[2]?.id||first,ps[3]?.id||first];}
-  rebuildKeeperAssignRow('keeperAssignRow','keepk');
-  save();
-});
-
-document.getElementById('btnSaveSetup').addEventListener('click',()=>{
-  state.team = document.getElementById('teamName').value.trim()||'Team';
-  state.formation = Number(document.getElementById('formation').value)||5;
-  state.keepersMode = Number(document.getElementById('keepersMode').value)||1;
-  readKeeperAssign('keepk');
-  recomputeAndGoLive();
-});
-
-// Live kwart navigatie
+document.getElementById('btnAdd').addEventListener('click',()=>{state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,benchCd:0}); save(); renderPlayersList();});
+document.getElementById('btnReset').addEventListener('click',()=>{if(confirm('Team resetten naar vaste 8 spelers?')){state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name:n,pos:POS[i%3],present:true,benchCd:0})); const ps=state.players.map(p=>p.id); state.keeperByQuarter=[ps[0],ps[1]||ps[0],ps[2]||ps[0],ps[3]||ps[0]]; recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();}});
+document.getElementById('keepersMode').addEventListener('change',()=>{state.keepersMode=Number(document.getElementById('keepersMode').value)||1; keeperAssignUI('keeperAssignRow','keepk'); save();});
+document.getElementById('btnSaveSetup').addEventListener('click',()=>{state.team=document.getElementById('teamName').value.trim()||'Team'; state.formation=Number(document.getElementById('formation').value)||5; state.keepersMode=Number(document.getElementById('keepersMode').value)||1; readKeeperAssign('keepk'); recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();});
 document.getElementById('btnPrevView').addEventListener('click',()=>{state.viewQ=Math.max(1,state.viewQ-1); renderLive();});
 document.getElementById('btnCurr').addEventListener('click',()=>{state.viewQ=state.q; renderLive();});
 document.getElementById('btnNext').addEventListener('click',()=>{state.viewQ=Math.min(4,state.viewQ+1); renderLive();});
+document.getElementById('btnQuickRecalc').addEventListener('click',()=>{state.formation=Number(document.getElementById('quickFormation').value)||state.formation; readKeeperAssign('quickk'); recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();});
+document.getElementById('btnQuickToLive').addEventListener('click',()=>{document.querySelector('.tab button[data-tab="live"]').click(); state.viewQ=state.q; renderLive();});
 
-// Snelle wijzigingen
-document.getElementById('btnQuickRecalc').addEventListener('click',()=>{
-  state.formation = Number(document.getElementById('quickFormation').value)||state.formation;
-  readKeeperAssign('quickk');
-  recomputeAndGoLive();
-});
-document.getElementById('btnQuickToLive').addEventListener('click',()=>{
-  document.querySelector('.tab button[data-tab="live"]').click();
-  state.viewQ=state.q; renderLive();
-});
+document.getElementById('btnStart').addEventListener('click',start);
+document.getElementById('btnPause').addEventListener('click',pause);
+document.getElementById('btnDidSwap').addEventListener('click',()=>{hideSwap();});
 
-/* --- Bootstrap --- */
-load();
-ensureDefaults();
-recomputeAll();
-renderSetup(); // initial render of setup (first tab active)
+/* BOOT */
+function updateTimerUI(){document.getElementById('clock').textContent=fmt(state.elapsedMs); document.getElementById('progressBar').style.width=Math.min(100,(state.elapsedMs/state.quarterMs)*100)+'%';}
+load(); ensureDefaults(); recomputeAll(); renderSetup();
 </script>
 </body>
 </html>
