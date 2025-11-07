@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wissel Planner O9</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --gap: 12px; --radius: 12px; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans"; margin: 0; background: #0f172a; color: #e2e8f0; }
+  header { padding: 16px; background: #111827; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:2; }
+  header h1 { margin: 0; font-size: 1.05rem; }
+  main { padding: 16px; display:grid; grid-template-columns: 1fr; gap: var(--gap); max-width: 1200px; margin-inline:auto; }
+  @media (min-width: 1100px) { main { grid-template-columns: 460px 1fr; } }
+  section { background:#111827; border:1px solid #1f2937; border-radius: var(--radius); }
+  section h2 { margin: 0; padding: 12px 16px; border-bottom:1px solid #1f2937; font-size:1rem; color:#93c5fd; }
+  .content { padding: 12px 16px; }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom:8px; flex-wrap:wrap; }
+  input[type="text"], input[type="number"], select { background:#0b1220; color:#e5e7eb; border:1px solid #334155; border-radius:10px; padding:8px 10px; }
+  input[type="checkbox"] { transform: scale(1.2); }
+  button { background:#2563eb; color:white; border:none; padding:10px 12px; border-radius:10px; cursor:pointer; }
+  button.secondary { background:#374151; }
+  button.ghost { background:transparent; border:1px solid #334155; }
+  .muted { color:#93a2b2; font-size: 0.9rem; }
+  .pill { padding: 2px 8px; border-radius:999px; background:#0b1220; border:1px solid #334155; color:#cbd5e1; font-size:12px; }
+  .list { display:flex; flex-direction:column; gap:6px; }
+  .player { display:grid; grid-template-columns: 22px 1fr auto; gap:10px; align-items:center; padding:8px; border:1px dashed #334155; border-radius:10px; background:#0b1220; }
+  .metrics { display:flex; flex-wrap:wrap; gap:6px; }
+  table { width:100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom:1px solid #1f2937; padding:8px; text-align:left; vertical-align:top; }
+  tr:nth-child(even) td { background:#0b1220; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+  .lineup { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { background:#0b1220; border:1px solid #334155; padding:4px 8px; border-radius:999px; }
+  .ok { color:#22c55e; }
+  .warn { color:#f59e0b; }
+  .bad { color:#ef4444; }
+  .footer { padding: 12px 16px; font-size: 12px; color:#9ca3af; text-align:center; }
+  .scroll { overflow:auto; }
+  .small { font-size: 12px; }
+  .nowrap { white-space: nowrap; }
+  .posTag { font-size: 11px; opacity:.8; }
+  .live { display:grid; gap:10px; }
+  .timerBox { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px; border:1px solid #334155; border-radius:12px; background:#0b1220; }
+  .timeBig { font-variant-numeric: tabular-nums; font-size: 2rem; letter-spacing: 0.5px; }
+  .timeSmall { font-variant-numeric: tabular-nums; opacity:.8; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; }
+  .currentLineup { display:grid; gap:8px; border:1px dashed #334155; border-radius:12px; padding:10px; background:#0b1220; }
+  .hl { outline:2px solid #60a5fa; }
+  .blink { animation: blink 1s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.92); color:#fff; display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:999; text-align:center; padding:24px; }
+  .overlay.show { display:flex; }
+  .overlay h3 { font-size: 2.2rem; margin:0; }
+  .overlay .names { font-size:1.2rem; display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .banner { background:#7c3aed; border-left:4px solid #a78bfa; padding:8px 12px; border-radius:8px; }
+  .touchBtns button { padding:6px 10px; font-size:12px; }
+  .editLive { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Wissel Planner O9</h1>
+  <span class="pill" id="presenceSummary">0 aanwezig</span>
+  <span class="pill" id="benchSummary">bench 0 per slot</span>
+  <span class="pill" id="configSummary"></span>
+  <span class="muted">PWA • offline • iOS-friendly</span>
+</header>
+
+<main>
+  <div id="storageBanner" class="banner" style="display:none;">⚠️ Opslag niet beschikbaar (privémodus?). Gegevens worden tijdelijk onthouden. Gebruik <em>Exporteer</em> om te bewaren.</div>
+
+  <section id="roster">
+    <h2>Spelers, positie, aanwezigheid & keeper</h2>
+    <div class="content">
+      <div class="row">
+        <input id="newName" type="text" placeholder="Naam speler" inputmode="text"/>
+        <select id="newPos">
+          <option value="ALL">Allround</option>
+          <option value="DEF">Verdediger</option>
+          <option value="MID">Middenveld</option>
+          <option value="ATT">Aanvaller</option>
+        </select>
+        <button id="addBtn" type="button">Toevoegen</button>
+        <button class="secondary" id="resetBtn" type="button">Reset naar vaste 8</button>
+      </div>
+      <p class="muted small">Sleep of gebruik pijltjes: bovenaan = beste. “Aanwezig” = meerekenen, “K” = kandidaat-keeper.</p>
+      <div id="playerList" class="list"></div>
+    </div>
+  </section>
+
+  <section id="settings">
+    <h2>Wedstrijdinstellingen</h2>
+    <div class="content">
+      <div class="grid">
+        <label> Kwartieren: <input id="quarters" type="number" min="1" value="4"/></label>
+        <label> Min/kwart: <input id="minsPerQuarter" type="number" min="1" value="10"/></label>
+        <label> Wissel-interval (min): <input id="subInterval" type="number" min="1" value="5"/></label>
+        <label> Formatie (incl. keeper): 
+          <select id="formation">
+            <option value="6">6 (5+K)</option>
+            <option value="7">7 (6+K)</option>
+            <option value="5">5 (4+K)</option>
+          </select>
+        </label>
+        <label> Aantal keepers in rotatie:
+          <select id="keeperCount">
+            <option value="1">1 (hele wedstrijd)</option>
+            <option value="2">2 (per helft)</option>
+            <option value="4">4 (per kwart)</option>
+          </select>
+        </label>
+        <label> Keeper-selectie:
+          <select id="keeperPolicy">
+            <option value="prefer">Kandidaten eerst</option>
+            <option value="only">Alleen kandidaten</option>
+            <option value="any">Iedereen mag</option>
+          </select>
+        </label>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="generateBtn" type="button">Voorstel genereren</button>
+        <button class="ghost" id="exportBtn" type="button">Exporteer (CSV)</button>
+        <span class="muted small">Eerlijke minuten • gebalanceerde lijnen • live timer.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="live">
+    <h2>Live wissel-timer</h2>
+    <div class="content live">
+      <div class="timerBox">
+        <div>
+          <div class="small muted" id="quarterLabel">Kwart 1 / 4</div>
+          <div class="timeBig"><span id="elapsed">00:00</span> <span class="timeSmall muted">/ <span id="quarterLen">10:00</span></span></div>
+          <div class="muted small">Volgende wissel in: <span id="toNext">--:--</span></div>
+        </div>
+        <div class="controls">
+          <button id="startBtn" type="button">▶️ Start</button>
+          <button id="pauseBtn" type="button" class="secondary">⏸️ Pauze</button>
+          <button id="resetBtnQ" type="button" class="ghost">🔄 Reset kwart</button>
+          <label class="small"><input type="checkbox" id="beepChk" checked/> Geluid</label>
+          <label class="small"><input type="checkbox" id="vibrateChk" checked/> Trillen</label>
+          <label class="small"><input type="checkbox" id="autoNextChk" checked/> Auto-door</label>
+          <button id="prevBtn" type="button" class="ghost">⟵ Vorig</button>
+          <button id="nextBtn" type="button" class="ghost">Volgend ⟶</button>
+          <button id="fullscreenBtn" type="button" class="ghost">⛶ Volledig scherm</button>
+        </div>
+      </div>
+      <div class="currentLineup">
+        <div class="muted small">Actuele opstelling (tap naam om veld ↔ bank te wisselen; kies keeper):</div>
+        <div><strong>Keeper:</strong> <select id="liveKeeperSelect"></select></div>
+        <div class="editLive">
+          <div><strong>Op veld:</strong> <span id="liveFieldEdit">—</span></div>
+        </div>
+        <div class="editLive">
+          <div class="muted small">Bank:</div> <span id="liveBenchEdit">—</span>
+        </div>
+        <div class="row">
+          <select id="stopPlayerSelect"></select>
+          <button id="stopPlayerBtn" type="button" class="secondary">⛑️ Speler stopt</button>
+          <button id="applyLiveBtn" type="button" class="ghost">✅ Toepassen op huidig slot</button>
+          <button id="recalcBtn" type="button">🔁 Herbereken vanaf nu</button>
+        </div>
+      </div>
+      <div class="muted small">Bij wisselmoment verschijnt <strong>“WISSEL NU”</strong> met <strong>uitgaande</strong> spelers.</div>
+    </div>
+  </section>
+
+  <section id="schedule">
+    <h2>Schema</h2>
+    <div class="content scroll">
+      <table id="scheduleTable">
+        <thead>
+          <tr>
+            <th>Slot</th>
+            <th>Tijd</th>
+            <th>Keeper</th>
+            <th>Veld</th>
+            <th>Bank</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="metrics" class="content">
+        <h3 class="muted">Speeltijd per speler</h3>
+        <div class="metrics" id="minutesStats"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="swapOverlay">
+  <h3>WISSEL NU</h3>
+  <div class="muted">Uitgaande spelers:</div>
+  <div id="outNames" class="names"></div>
+  <button id="hideOverlay" type="button" class="secondary">OK</button>
+</div>
+
+<div class="footer">PWA • offline • voeg toe aan startscherm. © Wissel Planner O9</div>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(console.error));
+}
+let canStore = true;
+try{ localStorage.setItem('__test','1'); localStorage.removeItem('__test'); }catch(e){ canStore=false; document.getElementById('storageBanner').style.display='block'; }
+function storeSet(k,v){ if(canStore){ localStorage.setItem(k,v); } else { window.__mem=window.__mem||{}; __mem[k]=v; } }
+function storeGet(k){ if(canStore){ return localStorage.getItem(k); } return (window.__mem||{})[k]||null; }
+
+const POS_LABEL = {ALL:"Allround", DEF:"Verd", MID:"Mid", ATT:"Aanv"};
+const DEFAULT_NAMES = ["Wouter","Sydney","Twan","Milan","Ryan","Dani","Finn","Diede"];
+function rid(){ try{ if(typeof crypto!=='undefined' && crypto && typeof crypto.randomUUID==='function'){ return crypto.randomUUID(); } }catch(e){} return 'id-'+Math.random().toString(36).slice(2); }
+function $(id){ return document.getElementById(id); }
+function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function fmtTime(sec){ const m = Math.floor(sec/60), s = Math.floor(sec%60); return pad2(m)+":"+pad2(s); }
+function vibrate(pattern){ try{ if($('vibrateChk').checked && navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
+
+// ---- State ----
+let state = JSON.parse(storeGet("wisselplanner_state_o9")||"null") || {
+  players: DEFAULT_NAMES.map((n,i)=>({id:rid(), name:n, present:true, keeperCandidate:(i<3), pos:"ALL", quality:(DEFAULT_NAMES.length-i)})),
+  quarters:4, minsPerQuarter:10, subInterval:5, formation:6,
+  keeperPolicy:"prefer", keeperCount:1
+};
+function save(){ storeSet("wisselplanner_state_o9", JSON.stringify(state)); updateSummaries(); }
+
+// ---- Roster ----
+const listEl = $("playerList");
+function renderRoster(){
+  listEl.innerHTML="";
+  state.players.forEach((p, idx)=>{
+    const row = document.createElement("div");
+    row.className = "player";
+    row.dataset.id = p.id;
+    row.innerHTML = `
+      <div class="handle" title="Sleep of gebruik pijltjes">☰</div>
+      <div>
+        <div class="row">
+          <input type="text" value="${escapeHtml(p.name)}" class="name" style="flex:1" />
+          <select class="pos">
+            <option value="ALL"${p.pos==="ALL"?" selected":""}>Allround</option>
+            <option value="DEF"${p.pos==="DEF"?" selected":""}>Verdediger</option>
+            <option value="MID"${p.pos==="MID"?" selected":""}>Middenveld</option>
+            <option value="ATT"${p.pos==="ATT"?" selected":""}>Aanvaller</option>
+          </select>
+          <label class="small nowrap"><input type="checkbox" class="present"${p.present?" checked":""}/> Aanwezig</label>
+          <label class="small nowrap"><input type="checkbox" class="keeper"${p.keeperCandidate?" checked":""}/> K</label>
+        </div>
+        <div class="row touchBtns">
+          <button type="button" class="ghost up">↑</button>
+          <button type="button" class="ghost down">↓</button>
+          <span class="muted small">Kwaliteit: ${state.players.length - idx} • <span class="posTag">${POS_LABEL[p.pos]}</span></span>
+        </div>
+      </div>
+      <div><button class="ghost remove" type="button">✖</button></div>
+    `;
+    listEl.appendChild(row);
+    row.querySelector(".name").addEventListener("input", (e)=>{ p.name = e.target.value; save(); syncLiveEditors(); });
+    row.querySelector(".pos").addEventListener("change", (e)=>{ p.pos = e.target.value; save(); });
+    row.querySelector(".present").addEventListener("change", (e)=>{ p.present = e.target.checked; save(); updateSummaries(); });
+    row.querySelector(".keeper").addEventListener("change", (e)=>{ p.keeperCandidate = e.target.checked; save(); });
+    row.querySelector(".remove").addEventListener("click", ()=>{
+      state.players = state.players.filter(x=>x.id!==p.id);
+      save(); renderRoster(); syncLiveEditors();
+    });
+    row.querySelector(".up").addEventListener("click", ()=> movePlayer(p.id, -1));
+    row.querySelector(".down").addEventListener("click", ()=> movePlayer(p.id, +1));
+  });
+}
+function movePlayer(id, dir){
+  const i = state.players.findIndex(x=>x.id===id);
+  const j = i + dir;
+  if(j<0 || j>=state.players.length) return;
+  const [m] = state.players.splice(i,1);
+  state.players.splice(j,0,m);
+  state.players.forEach((pp,i)=> pp.quality = (state.players.length - i));
+  save(); renderRoster(); syncLiveEditors();
+}
+
+$("addBtn").addEventListener("click", addPlayer);
+$("newName").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); addPlayer(); }});
+function addPlayer(){
+  let name = $("newName").value.trim();
+  if(!name){ name = `Speler ${state.players.length+1}`; }
+  const pos = $("newPos").value;
+  state.players.push({id:rid(), name, present:true, keeperCandidate:false, pos, quality:1});
+  state.players.forEach((pp,i)=> pp.quality = (state.players.length - i));
+  $("newName").value="";
+  save(); renderRoster(); updateSummaries(); syncLiveEditors();
+}
+$("resetBtn").addEventListener("click", ()=>{
+  if(!confirm("Reset naar vaste 8 (Wouter t/m Diede)?")) return;
+  state.players = DEFAULT_NAMES.map((n,i)=>({id:rid(), name:n, present:true, keeperCandidate:(i<3), pos:"ALL", quality:(DEFAULT_NAMES.length-i)}));
+  save(); renderRoster(); updateSummaries(); syncLiveEditors();
+});
+
+// ---- Settings ----
+["quarters","minsPerQuarter","subInterval"].forEach(id => {
+  $(id).value = state[id];
+  $(id).addEventListener("change", e=>{ state[id] = parseInt(e.target.value,10)||0; if(state[id]<=0) state[id]=1; save(); computeQuarterLen(); });
+});
+$("formation").value = String(state.formation);
+$("formation").addEventListener("change", e=>{ state.formation=parseInt(e.target.value,10); save(); updateSummaries(); });
+$("keeperPolicy").value = state.keeperPolicy;
+$("keeperPolicy").addEventListener("change", e=>{ state.keeperPolicy=e.target.value; save(); });
+$("keeperCount").value = String(state.keeperCount||1);
+$("keeperCount").addEventListener("change", e=>{ state.keeperCount=parseInt(e.target.value,10); save(); });
+
+// ---- Scheduler ----
+function buildSegments(){
+  const totalMinutes = state.quarters * state.minsPerQuarter;
+  const slotsPerQuarter = Math.ceil(state.minsPerQuarter / state.subInterval);
+  const segments = [];
+  let time = 0;
+  for(let q=0; q<state.quarters; q++){
+    for(let s=0; s<slotsPerQuarter; s++){
+      const start=time;
+      const end = Math.min(totalMinutes, time + state.subInterval);
+      segments.push({q, s, start, end, duration:end-start});
+      time=end;
+    }
+  }
+  return segments;
+}
+function slotsPerQuarter(){ return Math.ceil(state.minsPerQuarter / state.subInterval); }
+function segIndex(seg){ const spq = slotsPerQuarter(); return seg.q*spq + seg.s; }
+
+function minutesFor(playerId, schedule){
+  let m=0;
+  for(const slot of schedule){ if(slot.keeper?.id===playerId) m+=slot.duration; if(slot.field.find(p=>p.id===playerId)) m+=slot.duration; }
+  return m;
+}
+function getKeeperPool(players){
+  if(state.keeperPolicy==="any"){ return players; }
+  if(state.keeperPolicy==="only"){ return players.filter(p=>p.keeperCandidate); }
+  const cand = players.filter(p=>p.keeperCandidate);
+  return cand.length ? cand : players;
+}
+function keeperSegmentKey(seg){
+  if(state.keeperCount===1) return 0; // whole match
+  if(state.keeperCount===2) return (seg.q < state.quarters/2) ? 0 : 1; // halves
+  return seg.q; // per quarter (4+)
+}
+function pickKeeperForKey(players, minutesMap, keeperCountMap){
+  const pool = getKeeperPool(players);
+  return [...pool].sort((a,b)=>{
+    const kdiff = (keeperCountMap.get(a.id)||0) - (keeperCountMap.get(b.id)||0);
+    if(kdiff!==0) return kdiff;
+    const mdiff = (minutesMap.get(a.id)||0) - (minutesMap.get(b.id)||0);
+    if(mdiff!==0) return mdiff;
+    const qdiff = a.quality - b.quality;
+    return qdiff;
+  })[0];
+}
+function pickFieldPlayers(needed, available, minutesMap, targetAvgQuality){
+  const sorted = [...available].sort((a,b)=>{
+    const mdiff = (minutesMap.get(a.id)||0) - (minutesMap.get(b.id)||0);
+    if(mdiff!==0) return mdiff;
+    const adiff = Math.abs(a.quality - targetAvgQuality) - Math.abs(b.quality - targetAvgQuality);
+    if(adiff!==0) return adiff;
+    return a.name.localeCompare(b.name);
+  });
+  const chosen = [];
+  let low=0, high=sorted.length-1;
+  while(chosen.length<needed && (low<=high)){
+    const currentAvg = chosen.length ? (chosen.reduce((s,p)=>s+p.quality,0)/chosen.length) : targetAvgQuality;
+    if(currentAvg < targetAvgQuality){ chosen.push(sorted[high--]); } else { chosen.push(sorted[low++]); }
+  }
+  return chosen;
+}
+function repairPositions(field, bench, keeper){
+  const exist = {DEF:false,MID:false,ATT:false};
+  state.players.filter(p=>p.present && p.id!==keeper.id).forEach(p=>{ if(p.pos!=="ALL") exist[p.pos]=true; });
+  const ensure = ["DEF","MID","ATT"];
+  for(const pos of ensure){
+    if(!exist[pos]) continue;
+    const has = field.some(p=>p.pos===pos || p.pos==="ALL");
+    if(!has){
+      const candidateIn = bench.find(p=>p.pos===pos) || bench.find(p=>p.pos==="ALL");
+      if(!candidateIn) continue;
+      const posCountsField = {DEF:0,MID:0,ATT:0,ALL:0};
+      field.forEach(p=> posCountsField[p.pos] = (posCountsField[p.pos]||0)+1 );
+      let idxOut = field.findIndex(p=> p.pos!=="ALL" && posCountsField[p.pos]>1 );
+      if(idxOut===-1) idxOut = field.findIndex(p=> p.pos==="ALL");
+      if(idxOut===-1) idxOut = field.length-1;
+      const out = field[idxOut];
+      field[idxOut] = candidateIn;
+      const bi = bench.findIndex(p=>p.id===candidateIn.id);
+      bench[bi] = out;
+    }
+  }
+}
+
+let lastSchedule = [];
+function generateSchedule(fromIndex=0, minutesSeed=null){
+  const segments = buildSegments();
+  const present = state.players.filter(p=>p.present);
+  if(present.length < state.formation){ alert(`Te weinig spelers aanwezig (${present.length}) voor formatie ${state.formation}.`); return []; }
+  // seed minutes with played minutes up to fromIndex
+  const minutesMap = new Map(present.map(p=>[p.id,0]));
+  if(minutesSeed){ for(const [id,val] of minutesSeed.entries()) if(minutesMap.has(id)) minutesMap.set(id, val); }
+  // assign keeper per keeper-key
+  const keeperCountMap = new Map(present.map(p=>[p.id,0]));
+  const keeperForKey = new Map();
+  for(let i=0;i<segments.length;i++){
+    if(i<fromIndex){ continue; }
+    const seg = segments[i];
+    const key = keeperSegmentKey(seg);
+    if(!keeperForKey.has(key)){
+      const k = pickKeeperForKey(present, minutesMap, keeperCountMap);
+      keeperForKey.set(key, k);
+      keeperCountMap.set(k.id, (keeperCountMap.get(k.id)||0)+1);
+    }
+  }
+  // build schedule
+  const sched = [];
+  const targetAvgQuality = present.reduce((s,p)=>s+p.quality,0) / present.length;
+  for(let i=0;i<segments.length;i++){
+    const seg = segments[i];
+    let keeper, field, bench;
+    if(i<fromIndex && lastSchedule[i]){
+      // keep existing
+      keeper = lastSchedule[i].keeper;
+      field = lastSchedule[i].field;
+      bench = lastSchedule[i].bench;
+    } else {
+      const key = keeperSegmentKey(seg);
+      keeper = keeperForKey.get(key);
+      const fieldPool = present.filter(p=>p.id!==keeper.id);
+      field = pickFieldPlayers(state.formation-1, fieldPool, minutesMap, targetAvgQuality);
+      const onFieldIds = new Set([keeper.id, ...field.map(p=>p.id)]);
+      bench = present.filter(p=>!onFieldIds.has(p.id));
+      repairPositions(field, bench, keeper);
+      // accrue minutes for fairness going forward
+      minutesMap.set(keeper.id, (minutesMap.get(keeper.id)||0) + seg.duration);
+      field.forEach(p=> minutesMap.set(p.id, (minutesMap.get(p.id)||0) + seg.duration));
+    }
+    sched.push({ ...seg, keeper, field, bench });
+  }
+  lastSchedule = sched;
+  return sched;
+}
+
+// ---- Render schedule + metrics ----
+function renderSchedule(schedule){
+  const tbody = $("scheduleTable").querySelector("tbody");
+  tbody.innerHTML="";
+  if(!schedule.length){ tbody.innerHTML = `<tr><td colspan="5" class="muted">Nog geen schema.</td></tr>`; $("minutesStats").innerHTML=""; return; }
+  for(const seg of schedule){
+    const tr = document.createElement("tr");
+    tr.dataset.index = segIndex(seg);
+    const timeLabel = `${pad2(seg.start)}–${pad2(seg.end)}m`;
+    tr.innerHTML = `
+      <td>Q${seg.q+1} • ${seg.s+1}</td>
+      <td>${timeLabel}</td>
+      <td>${escapeHtml(seg.keeper?.name||"")}</td>
+      <td><div class="lineup">${seg.field.map(p=>`<span class="chip">${escapeHtml(p.name)} <span class='small muted'>[${POS_LABEL[p.pos]}]</span></span>`).join("")}</div></td>
+      <td class="muted small">${seg.bench.map(p=>`${escapeHtml(p.name)}${p.pos?` [${POS_LABEL[p.pos]}]`:""}`).join(", ")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  const present = state.players.filter(p=>p.present);
+  const totalMins = state.quarters*state.minsPerQuarter;
+  const minsPerPlayerIdeal = (totalMins * state.formation) / present.length;
+  const stats = present.map(p=>{
+    const m = minutesFor(p.id, schedule);
+    const diff = Math.round(m - minsPerPlayerIdeal);
+    const cls = Math.abs(diff)<=5 ? "ok" : (Math.abs(diff)<=10 ? "warn" : "bad");
+    return `<span class="chip ${cls}">${escapeHtml(p.name)} • ${m}m (${diff>=0?"+":""}${diff})</span>`;
+  }).join(" ");
+  $("minutesStats").innerHTML = stats;
+}
+
+// ---- Summaries ----
+function updateSummaries(){
+  const present = state.players.filter(p=>p.present);
+  $("presenceSummary").textContent = `${present.length} aanwezig`;
+  const benchPerSlot = Math.max(0, present.length - state.formation);
+  $("benchSummary").textContent = `bench ${benchPerSlot} per slot`;
+  const km = (state.keeperCount===1?"wedstrijd":state.keeperCount===2?"helft":"kwart");
+  $("configSummary").textContent = `${state.quarters}x${state.minsPerQuarter}m • wissel ${state.subInterval}m • keep per ${km}`;
+}
+
+// ---- Timer + Live ----
+let timer = null, startEpoch = 0, paused = true, elapsedSec = 0, curSegIndex = 0;
+function computeQuarterLen(){ $("quarterLen").textContent = fmtTime(state.minsPerQuarter*60); $("quarterLabel").textContent = `Kwart ${Math.floor(curSegIndex / slotsPerQuarter()) + 1} / ${state.quarters}`; }
+function currentQuarter(){ const spq = slotsPerQuarter(); return Math.floor(curSegIndex / spq); }
+function highlightRow(){
+  const tbody = $("scheduleTable").querySelector("tbody");
+  tbody.querySelectorAll("tr").forEach(tr=> tr.classList.remove("hl"));
+  const row = tbody.querySelector(`tr[data-index="${curSegIndex}"]`);
+  if(row){ row.classList.add("hl"); row.scrollIntoView({behavior:"smooth", block:"center"}); }
+}
+function applyLiveSegment(){
+  if(!lastSchedule.length) return;
+  const seg = lastSchedule[curSegIndex] || lastSchedule[lastSchedule.length-1];
+  // Build live editors
+  const keeperSel = $("liveKeeperSelect");
+  keeperSel.innerHTML = state.players.filter(p=>p.present).map(p=>`<option value="${p.id}"${seg.keeper && p.id===seg.keeper.id?' selected':''}>${escapeHtml(p.name)}</option>`).join("");
+  const fieldSpan = $("liveFieldEdit");
+  const benchSpan = $("liveBenchEdit");
+  const mkChip = (p, onField) => `<button data-id="${p.id}" class="chip" style="cursor:pointer">${escapeHtml(p.name)} <span class='small muted'>[${POS_LABEL[p.pos]}]</span> ${onField?'⤴':'⤵'}</button>`;
+  fieldSpan.innerHTML = seg.field.map(p=>mkChip(p,true)).join(" ");
+  benchSpan.innerHTML = seg.bench.map(p=>mkChip(p,false)).join(" ");
+  // stop-select list
+  const stopSel = $("stopPlayerSelect");
+  stopSel.innerHTML = state.players.filter(p=>p.present).map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  // Click handlers to toggle field/bench chips
+  fieldSpan.querySelectorAll("button").forEach(btn=> btn.addEventListener("click", ()=> toggleLive(btn.dataset.id, false)));
+  benchSpan.querySelectorAll("button").forEach(btn=> btn.addEventListener("click", ()=> toggleLive(btn.dataset.id, true)));
+}
+function toggleLive(playerId, moveToField){
+  const seg = lastSchedule[curSegIndex];
+  const player = state.players.find(p=>p.id===playerId);
+  if(!player) return;
+  if(moveToField){
+    if(seg.field.length >= state.formation-1){ alert("Veld is vol."); return; }
+    seg.bench = seg.bench.filter(p=>p.id!==playerId);
+    seg.field.push(player);
+  } else {
+    seg.field = seg.field.filter(p=>p.id!==playerId);
+    seg.bench.push(player);
+  }
+  applyLiveSegment();
+}
+$("applyLiveBtn").addEventListener("click", ()=>{
+  const seg = lastSchedule[curSegIndex];
+  const newKeeperId = $("liveKeeperSelect").value;
+  const newKeeper = state.players.find(p=>p.id===newKeeperId);
+  if(newKeeper) seg.keeper = newKeeper;
+  // Ensure counts
+  if(seg.field.length > state.formation-1){ seg.bench = seg.bench.concat(seg.field.splice(state.formation-1)); }
+  const onIds = new Set([seg.keeper.id, ...seg.field.map(p=>p.id)]);
+  seg.bench = state.players.filter(p=>p.present && !onIds.has(p.id));
+  renderSchedule(lastSchedule);
+  highlightRow();
+});
+
+$("stopPlayerBtn").addEventListener("click", ()=>{
+  const pid = $("stopPlayerSelect").value;
+  const p = state.players.find(x=>x.id===pid);
+  if(!p) return;
+  p.present = false; // mark absent
+  save();
+  // remove from all future slots and recalc from next boundary
+  const minutesSeed = playedMinutesUpTo(curSegIndex);
+  const nextIndex = curSegIndex; // from current slot onward
+  const sched = generateSchedule(nextIndex, minutesSeed);
+  renderSchedule(sched); applyLiveSegment(); highlightRow();
+});
+
+$("recalcBtn").addEventListener("click", ()=>{
+  const minutesSeed = playedMinutesUpTo(curSegIndex);
+  const sched = generateSchedule(curSegIndex, minutesSeed);
+  renderSchedule(sched); applyLiveSegment(); highlightRow();
+});
+
+function playedMinutesUpTo(idx){
+  const present = state.players.filter(p=>p.present);
+  const map = new Map(present.map(p=>[p.id,0]));
+  for(let i=0; i<Math.min(idx,lastSchedule.length); i++){
+    const seg = lastSchedule[i];
+    if(!seg) continue;
+    const dur = seg.duration;
+    if(seg.keeper) map.set(seg.keeper.id, (map.get(seg.keeper.id)||0)+dur);
+    seg.field.forEach(p=> map.set(p.id, (map.get(p.id)||0)+dur));
+  }
+  return map;
+}
+
+function updateLiveFromTime(){
+  if(elapsedSec < 0) elapsedSec = 0;
+  if(elapsedSec > state.minsPerQuarter*60) elapsedSec = state.minsPerQuarter*60;
+  $("elapsed").textContent = fmtTime(elapsedSec);
+  const subSec = state.subInterval*60;
+  const nextBoundary = Math.ceil(elapsedSec / subSec) * subSec;
+  $("toNext").textContent = fmtTime(Math.max(0, nextBoundary - elapsedSec));
+  const spq = slotsPerQuarter();
+  const q = currentQuarter();
+  $("quarterLabel").textContent = `Kwart ${q+1} / ${state.quarters}`;
+  const slotInQuarter = Math.min(spq-1, Math.floor(elapsedSec / subSec));
+  const newSegIndex = q*spq + slotInQuarter;
+  if(newSegIndex !== curSegIndex){
+    curSegIndex = newSegIndex;
+    applyLiveSegment(); highlightRow();
+  }
+  if(!paused && elapsedSec >= state.minsPerQuarter*60){
+    doSignal(true);
+    paused = true; clearInterval(timer); timer=null;
+  }
+}
+function doSignal(endOfQuarter=false){
+  if($("beepChk").checked){ try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type="square"; o.frequency.value= endOfQuarter ? 440 : 880; g.gain.value=0.05;
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, endOfQuarter?700:400);
+  }catch(e){} }
+  vibrate(endOfQuarter ? [200,100,200,100,200] : [200,100,200]);
+  const box = document.querySelector(".timerBox"); box.classList.add("blink"); setTimeout(()=> box.classList.remove("blink"), 2500);
+}
+
+$("startBtn").addEventListener("click", ()=>{
+  if(!lastSchedule.length){ alert("Genereer eerst een schema."); return; }
+  if(!paused) return;
+  paused = false;
+  startEpoch = performance.now() - elapsedSec*1000;
+  timer = setInterval(()=>{
+    const now = performance.now();
+    const prevElapsed = elapsedSec;
+    elapsedSec = Math.max(0, (now - startEpoch)/1000);
+    const subSec = state.subInterval*60;
+    const prevSlot = Math.floor(prevElapsed / subSec);
+    const curSlot = Math.floor(elapsedSec / subSec);
+    if(curSlot !== prevSlot && Math.floor(elapsedSec) !== 0){
+      if($("autoNextChk").checked){
+        // compute outgoing names
+        const prevSeg = lastSchedule[curSegIndex];
+        const spq = slotsPerQuarter();
+        const q = currentQuarter();
+        curSegIndex = Math.min(q*spq + curSlot, lastSchedule.length-1);
+        const curSeg = lastSchedule[curSegIndex];
+        const out = [];
+        const curSet = new Set([curSeg.keeper?.id, ...curSeg.field.map(p=>p.id)]);
+        if(prevSeg.keeper && !curSet.has(prevSeg.keeper.id)) out.push(prevSeg.keeper.name + " (K)");
+        prevSeg.field.forEach(p=>{ if(!curSet.has(p.id)) out.push(p.name); });
+        if(out.length){ showSwapOverlay(out); }
+        doSignal(false);
+        applyLiveSegment(); highlightRow();
+      }
+    }
+    updateLiveFromTime();
+  }, 250);
+});
+$("pauseBtn").addEventListener("click", ()=>{ paused = true; if(timer){ clearInterval(timer); timer=null; } });
+$("resetBtnQ").addEventListener("click", ()=>{
+  if(timer){ clearInterval(timer); timer=null; }
+  paused = true; elapsedSec = 0;
+  const spq = slotsPerQuarter(); const q = currentQuarter();
+  curSegIndex = q*spq; updateLiveFromTime(); applyLiveSegment(); highlightRow();
+});
+$("prevBtn").addEventListener("click", ()=>{
+  if(curSegIndex>0){ curSegIndex--; elapsedSec = (curSegIndex % slotsPerQuarter()) * state.subInterval * 60; applyLiveSegment(); highlightRow(); updateLiveFromTime(); }
+});
+$("nextBtn").addEventListener("click", ()=>{
+  if(curSegIndex < lastSchedule.length-1){ curSegIndex++; elapsedSec = (curSegIndex % slotsPerQuarter()) * state.subInterval * 60; applyLiveSegment(); highlightRow(); updateLiveFromTime(); }
+});
+$("fullscreenBtn").addEventListener("click", ()=>{ const el = document.documentElement; if(el.requestFullscreen) el.requestFullscreen(); });
+
+// ---- Overlay ----
+function showSwapOverlay(outgoing){
+  const overlay = $("swapOverlay");
+  const list = $("outNames");
+  list.innerHTML = outgoing.map(n=>`<span class="chip">${escapeHtml(n)}</span>`).join(" ");
+  overlay.classList.add("show");
+}
+$("hideOverlay").addEventListener("click", ()=> $("swapOverlay").classList.remove("show"));
+
+// ---- Generate/Export ----
+$("generateBtn").addEventListener("click", ()=>{
+  curSegIndex = 0; elapsedSec = 0; paused = true; if(timer){ clearInterval(timer); timer=null; }
+  const sched = generateSchedule(0, null);
+  renderSchedule(sched);
+  computeQuarterLen(); updateLiveFromTime(); applyLiveSegment(); highlightRow(); save();
+});
+$("exportBtn").addEventListener("click", ()=>{
+  const schedule = lastSchedule.length ? lastSchedule : generateSchedule(0,null);
+  const rows = [["Slot","Start","Einde","Keeper","Veld","Bank"]];
+  schedule.forEach(seg=>{
+    rows.push([
+      `Q${seg.q+1}#${seg.s+1}`,
+      `${seg.start}`,
+      `${seg.end}`,
+      seg.keeper?seg.keeper.name:"",
+      seg.field.map(p=>`${p.name}${p.pos?` [${POS_LABEL[p.pos]}]`:""}`).join(" | "),
+      seg.bench.map(p=>`${p.name}${p.pos?` [${POS_LABEL[p.pos]}]`:""}`).join(" | ")
+    ]);
+  });
+  const csv = rows.map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "wissel_schema.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ---- Init ----
+function computeInitialQualities(){ state.players.forEach((pp,i)=> pp.quality = (state.players.length - i)); }
+function syncLiveEditors(){ if(lastSchedule.length){ applyLiveSegment(); } }
+(function init(){
+  renderRoster();
+  computeInitialQualities();
+  updateSummaries();
+  computeQuarterLen();
+})();
+</script>
+</body>
+</html>
