@@ -1,1 +1,629 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Wissel Planner O9 – De Esch</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1f4aa3">
+  <style>
+    :root{
+      --bg:#0b1020;--panel:#0f162c;--border:#1b2a4a;--muted:#9fb3d8;
+      --accent:#1f4aa3;--accent-2:#f5d02e;--chip:#0a1325;--chipb:#203656;
+      --radius:14px;--space:clamp(10px,2.5vw,16px);--fz-sm:clamp(12px,2.4vw,13px);--fz-md:clamp(14px,3.2vw,16px)
+    }
+    *{box-sizing:border-box;touch-action:manipulation}
+    body{margin:0;background:var(--bg);color:#e6eefc;font:16px system-ui}
+    header{position:sticky;top:0;background:linear-gradient(180deg,rgba(31,74,163,.9),rgba(31,74,163,.6));border-bottom:2px solid var(--accent-2);padding:12px;display:flex;gap:8px;align-items:center}
+    h1{margin:0;font-size:20px}
+    main{padding:var(--space);padding-bottom:100px;max-width:900px;margin:auto}
+    section{background:var(--panel);border:1px solid var(--border);border-radius:14px;margin:12px 0}
+    section h2{margin:0;padding:10px 12px;border-bottom:1px solid var(--border);color:var(--accent-2);font-size:14px}
+    .content{padding:12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+    input,select,button{min-height:44px;border-radius:10px;border:1px solid var(--chipb);background:var(--chip);color:#fff;padding:10px}
+    button{background:var(--accent)} button.ghost{background:transparent}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .player{position:relative;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px;border:1px dashed var(--chipb);border-radius:12px;background:var(--chip)}
+    .handle{touch-action:none;cursor:grab;font-weight:900;font-size:20px;color:#f5d02e;padding:0 6px}
+    .tabs{position:fixed;left:0;right:0;bottom:0;display:flex;border-top:2px solid var(--accent-2);background:var(--panel)}
+    .tab{flex:1;text-align:center;padding:10px;color:#cbd5e1;text-decoration:none}
+    .tab.active{background:#0a1325;color:#fff}
+    .tbl-wrap{overflow-x:auto}
+    .tbl{width:100%;border-collapse:collapse;min-width:700px}
+    .tbl th,.tbl td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
+    .lineup{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{background:var(--chip);border:1px solid var(--chipb);padding:6px 10px;border-radius:999px;cursor:pointer}
+    .time{font-variant-numeric:tabular-nums;font-size:28px}
+    .pill{padding:4px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--chipb);font-size:12px}
+  </style>
+</head>
+<body>
+<header>
+  <h1>⚽ De Esch – Wissel Planner O9</h1>
+  <span class="pill" id="presenceSummary">0</span>
+  <span class="pill" id="benchSummary">bench 0</span>
+</header>
+
+<main>
+  <!-- SETUP -->
+  <div id="page-setup">
+    <section><h2>Spelers</h2><div class="content">
+      <div class="row">
+        <input id="newName" placeholder="Naam speler">
+        <select id="newPos">
+          <option value="ALL">All</option><option value="DEF">Verd</option>
+          <option value="MID">Mid</option><option value="ATT">Aanv</option>
+        </select>
+        <button id="addBtn" type="button">Toevoegen</button>
+        <button class="ghost" id="resetBtn" type="button">Reset 8</button>
+        <button class="ghost" id="clearBtn" type="button">🧹 App leegmaken</button>
+      </div>
+      <div id="playerList" class="list"></div>
+    </div></section>
+
+    <section><h2>Instellingen</h2><div class="content">
+      <div class="row">
+        <label>Kwartieren<br><input id="quarters" type="number" value="4" min="1"></label>
+        <label>Min/kwart<br><input id="minsPerQuarter" type="number" value="10" min="1"></label>
+        <label>Wissel (min)<br><input id="subInterval" type="number" value="5" min="1"></label>
+        <label>Formatie<br>
+          <select id="formation">
+            <option value="6">6 (5+K)</option>
+            <option value="7">7 (6+K)</option>
+            <option value="5">5 (4+K)</option>
+          </select>
+        </label>
+        <label>Aantal keepers<br>
+          <select id="keeperCount"><option value="1">1</option><option value="2">2</option><option value="4">4</option></select>
+        </label>
+        <label>Keeper-selectie<br>
+          <select id="keeperPolicy">
+            <option value="prefer">Kandidaten eerst</option>
+            <option value="only">Alleen kandidaten</option>
+            <option value="any">Iedereen</option>
+          </select>
+        </label>
+      </div>
+      <div class="row"><label><input type="checkbox" id="strictMode"> ⚖️ Strikte eerlijkheid</label></div>
+      <div class="row"><button id="generateBtn" type="button">Voorstel genereren</button></div>
+    </div></section>
+  </div>
+
+  <!-- LIVE -->
+  <div id="page-live" style="display:none">
+    <section><h2>Tijdens de wedstrijd</h2><div class="content">
+      <div class="row">
+        <div>
+          <div id="qLabel">Kwart 1/4</div>
+          <div class="time"><span id="elapsed">00:00</span></div>
+          <div>Volgende wissel in: <span id="toNext">--:--</span></div>
+        </div>
+        <div class="row">
+          <button id="startBtn" type="button">▶️</button>
+          <button id="pauseBtn" class="ghost" type="button">⏸️</button>
+          <button id="resetBtnQ" class="ghost" type="button">🔄</button>
+          <button id="subNowBtn" class="ghost" type="button">🔔 Wissel NU</button>
+        </div>
+      </div>
+      <div class="row"><b>Keeper:</b>&nbsp;<span id="liveKeeper">—</span></div>
+      <div class="row"><b>Veld:</b>&nbsp;<span id="liveField">—</span></div>
+      <div class="row small">Bank: <span id="liveBench">—</span></div>
+
+      <div class="tbl-wrap">
+        <table class="tbl" id="scheduleTable">
+          <thead><tr><th>Slot</th><th>Tijd</th><th>Keeper</th><th>Veld</th><th>Bank</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div></section>
+  </div>
+
+  <!-- WIJZIGINGEN -->
+  <div id="page-changes" style="display:none">
+    <section><h2>Snelle wijzigingen</h2><div class="content">
+      <div class="row">
+        <select id="liveKeeperSelect"></select>
+        <button id="applyLiveBtn" class="ghost" type="button">✅ Toepassen</button>
+      </div>
+      <div class="row small"><b>Op veld:</b><div id="liveFieldEdit" class="lineup"></div></div>
+      <div class="row small"><b>Bank:</b><div id="liveBenchEdit" class="lineup"></div></div>
+      <div class="row">
+        <select id="stopPlayerSelect"></select>
+        <button id="stopPlayerBtn" class="ghost" type="button">⛑️ Speler stopt</button>
+        <button id="recalcBtn" type="button">🔁 Herbereken</button>
+      </div>
+    </div></section>
+  </div>
+</main>
+
+<nav class="tabs">
+  <a href="#setup" id="tab-setup" class="tab active">👥 Setup</a>
+  <a href="#live" id="tab-live" class="tab">⏱️ Live</a>
+  <a href="#changes" id="tab-changes" class="tab">🛠️ Wijzigingen</a>
+</nav>
+
+<button class="handle" id="fab" style="position:fixed;right:16px;bottom:92px;border-radius:999px;background:var(--accent-2);color:#000;border:none;padding:12px 16px;box-shadow:0 10px 24px rgba(0,0,0,.25)">≡＋</button>
+
+<script>
+/* PWA */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.error));
+}
+
+/* Helpers */
+const storeKey = 'wisselplanner_state_mobile_team_v2_3_16';
+const RANK_ORDER = ["Dani","Twan","Sydney","Ryan","Finn","Diede","Milan","Wouter"];
+function $(id){return document.getElementById(id)}
+function pad2(n){return String(n).padStart(2,'0')}
+function fmt(sec){const m=Math.floor(sec/60),s=Math.floor(sec%60);return pad2(m)+':'+pad2(s)}
+function vibrate(p){try{if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+function uid(){return (crypto.randomUUID?crypto.randomUUID():'id-'+Math.random().toString(36).slice(2))}
+
+/* State init */
+function initBase8(){
+  const keeperSet = new Set(["Dani","Twan","Sydney"]);
+  const arr = RANK_ORDER.map((n,i)=>({
+    id: uid(), name: n, pos: 'ALL', present: true,
+    keeperCandidate: keeperSet.has(n),
+    quality: RANK_ORDER.length - i
+  }));
+  return {
+    players: arr,
+    quarters: 4, minsPerQuarter: 10, subInterval: 5,
+    formation: 6, keeperCount: 1, keeperPolicy: 'prefer',
+    strict: false
+  };
+}
+let state=null;
+try{ state = JSON.parse(localStorage.getItem(storeKey)||'null'); }catch(e){ state=null; }
+const FORCE8 = new URLSearchParams(location.search).has('force8');
+if(!state || !Array.isArray(state.players) || state.players.length===0 || FORCE8){
+  state = initBase8(); localStorage.setItem(storeKey, JSON.stringify(state));
+}
+if (!state.players.every(p => p && typeof p.name==='string' && p.name.trim())){
+  state = initBase8(); localStorage.setItem(storeKey, JSON.stringify(state));
+}
+function save(){ localStorage.setItem(storeKey, JSON.stringify(state)); refreshSummaries(); }
+function refreshSummaries(){ const present=state.players.filter(p=>p.present); $('presenceSummary').textContent=present.length+' aanwezig'; $('benchSummary').textContent='bench '+Math.max(0,present.length-state.formation); }
+function renum(){ const n=state.players.length; state.players.forEach((p,i)=> p.quality=(n-i)); }
+
+/* Tabs */
+function showPage(hash){ const p=(hash||'#setup').replace('#',''); ['setup','live','changes'].forEach(x=>{ $('page-'+x).style.display=(x===p)?'block':'none'; $('tab-'+x).classList.toggle('active', x===p); }); }
+window.addEventListener('hashchange', ()=>showPage(location.hash)); showPage(location.hash||'#setup');
+
+/* Settings */
+['quarters','minsPerQuarter','subInterval'].forEach(id=>{
+  $(id).value=state[id];
+  $(id).addEventListener('change', e=>{ state[id]=parseInt(e.target.value,10)||1; save(); });
+});
+['formation','keeperCount','keeperPolicy'].forEach(id=>{
+  $(id).value=state[id];
+  $(id).addEventListener('change', e=>{
+    state[id]=(id==='formation'||id==='keeperCount')?parseInt(e.target.value,10):e.target.value; save();
+  });
+});
+$('strictMode').checked=!!state.strict;
+$('strictMode').addEventListener('change', e=>{
+  state.strict=e.target.checked;
+  if(state.strict){ state.subInterval=5; $('subInterval').value=5; $('subInterval').setAttribute('disabled','disabled'); }
+  else { $('subInterval').removeAttribute('disabled'); }
+  save();
+});
+
+/* Spelers + drag */
+function renderPlayers(){
+  const list=$('playerList'); list.innerHTML='';
+  state.players.forEach((p,idx)=>{
+    const el=document.createElement('div'); el.className='player'; el.dataset.id=p.id;
+    el.innerHTML=`<div class="row">
+        <input class="nm" value="${p.name}">
+        <label><input class="present" type="checkbox"${p.present?' checked':''}/> Aanw.</label>
+        <label><input class="k" type="checkbox"${p.keeperCandidate?' checked':''}/> K.</label>
+        <span>Pos:</span>
+        <select class="pos">
+          <option value="ALL"${p.pos==='ALL'?' selected':''}>All</option>
+          <option value="DEF"${p.pos==='DEF'?' selected':''}>Verd</option>
+          <option value="MID"${p.pos==='MID'?' selected':''}>Mid</option>
+          <option value="ATT"${p.pos==='ATT'?' selected':''}>Aanv</option>
+        </select>
+        <button class="ghost del" type="button">✖</button>
+      </div>
+      <div class="handle">≡</div>`;
+    list.appendChild(el);
+    el.querySelector('.nm').addEventListener('input',e=>{ p.name=e.target.value; save(); });
+    el.querySelector('.present').addEventListener('change',e=>{ p.present=e.target.checked; save(); refreshSummaries(); });
+    el.querySelector('.k').addEventListener('change',e=>{ p.keeperCandidate=e.target.checked; save(); });
+    el.querySelector('.pos').addEventListener('change',e=>{ p.pos=e.target.value; save(); });
+    el.querySelector('.del').addEventListener('click',()=>{ state.players.splice(idx,1); renum(); save(); renderPlayers(); });
+  });
+  enableDrag();
+}
+
+function enableDrag(){
+  const list = $('playerList');
+  let drag=null, ph=null, startY=0;
+
+  function dropAtPlaceholder(){
+    if(!drag||!ph) return;
+    ph.replaceWith(drag);
+    drag.style.position=''; drag.style.width=''; drag.style.left=''; drag.style.top=''; drag.style.zIndex=''; drag.style.transform='';
+    const newIdx=[...list.children].indexOf(drag);
+    const id=drag.dataset.id; const oldIdx=state.players.findIndex(p=>p.id===id);
+    const [m]=state.players.splice(oldIdx,1); state.players.splice(newIdx,0,m);
+    renum(); save(); vibrate([10]); drag=null; ph=null;
+  }
+  function onMove(e){
+    if(!drag) return; e.preventDefault();
+    const y=e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
+    const dy=y-startY; drag.style.transform=`translateY(${dy}px)`;
+    const margin=80; if(y<margin) window.scrollBy(0,-12); if(y>window.innerHeight-margin) window.scrollBy(0,12);
+    const items=[...list.children].filter(x=>x!==drag&&x!==ph);
+    for(const el of items){ const r=el.getBoundingClientRect(); if(y<r.top+r.height/2){ list.insertBefore(ph,el); return; } }
+    list.appendChild(ph);
+  }
+  function onUpOrCancel(){
+    if(!drag) return; dropAtPlaceholder();
+    document.removeEventListener('pointermove', onMove, {passive:false});
+    document.removeEventListener('pointerup', onUpOrCancel, {passive:false});
+    document.removeEventListener('pointercancel', onUpOrCancel, {passive:false});
+    document.removeEventListener('touchmove', onMove, {passive:false});
+    document.removeEventListener('touchend', onUpOrCancel, {passive:false});
+    document.removeEventListener('touchcancel', onUpOrCancel, {passive:false});
+  }
+  list.querySelectorAll('.handle').forEach(handle=>{
+    const item=handle.closest('.player');
+    handle.addEventListener('pointerdown',(e)=>{
+      e.preventDefault(); e.stopPropagation();
+      if(drag) onUpOrCancel();
+      drag=item; startY=e.clientY;
+      const r=item.getBoundingClientRect();
+      ph=document.createElement('div'); ph.style.height=r.height+'px'; ph.style.border='2px dashed #f5d02e'; ph.style.borderRadius='12px'; item.after(ph);
+      item.style.position='fixed'; item.style.width=r.width+'px'; item.style.left=r.left+'px'; item.style.top=r.top+'px'; item.style.zIndex=1000;
+      document.addEventListener('pointermove', onMove, {passive:false});
+      document.addEventListener('pointerup', onUpOrCancel, {passive:false});
+      document.addEventListener('pointercancel', onUpOrCancel, {passive:false});
+      document.addEventListener('touchmove', onMove, {passive:false});
+      document.addEventListener('touchend', onUpOrCancel, {passive:false});
+      document.addEventListener('touchcancel', onUpOrCancel, {passive:false});
+    }, {passive:false});
+  });
+}
+
+/* Add/Reset/Clear */
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderPlayers(); refreshSummaries();
+
+  $('addBtn').addEventListener('click', ()=>{
+    const name=($('newName').value||'').trim()||('Speler '+(state.players.length+1));
+    const pos=$('newPos').value||'ALL';
+    state.players.push({id:uid(), name, pos, present:true, keeperCandidate:false, quality:1});
+    renum(); save(); renderPlayers(); $('newName').value=''; $('newName').focus();
+  });
+  $('resetBtn').addEventListener('click', ()=>{
+    if(!confirm('Reset naar basis 8 (verborgen ranking)?')) return;
+    state=initBase8(); save(); renderPlayers(); refreshSummaries();
+  });
+  $('clearBtn').addEventListener('click', ()=>{
+    if(!confirm('App-gegevens wissen en basis 8 opnieuw laden?')) return;
+    try{ localStorage.removeItem(storeKey); }catch(e){}
+    state = initBase8();
+    save(); renderPlayers(); refreshSummaries();
+    alert('App is leeggemaakt en opnieuw gevuld met de basis 8.');
+  });
+  $('fab').addEventListener('click', ()=>{
+    const n=prompt('Naam nieuwe speler?'); if(!n) return;
+    state.players.push({id:uid(), name:n.trim(), pos:'ALL', present:true, keeperCandidate:false, quality:1});
+    renum(); save(); renderPlayers();
+  });
+});
+
+/* Planner */
+function buildSegments(){
+  const total=state.quarters*state.minsPerQuarter, step=state.subInterval, spq=Math.ceil(state.minsPerQuarter/step);
+  const segs=[]; let t=0;
+  for(let q=0;q<state.quarters;q++){
+    for(let s=0;s<spq;s++){ const start=t,end=Math.min(total,t+step); segs.push({q,s,start,end,duration:end-start}); t=end; }
+  }
+  return segs;
+}
+function keeperPool(pl){ if(state.keeperPolicy==='any') return pl; if(state.keeperPolicy==='only') return pl.filter(p=>p.keeperCandidate); const k=pl.filter(p=>p.keeperCandidate); return k.length?k:pl; }
+function pickKeeper(pl,minutes,kcount){
+  const pool=keeperPool(pl);
+  return [...pool].sort((a,b)=>(kcount.get(a.id)||0)-(kcount.get(b.id)||0)||(minutes.get(a.id)||0)-(minutes.get(b.id)||0)||a.quality-b.quality)[0];
+}
+function pickField(need,avail,minutes,targetAvg){
+  const s=[...avail].sort((a,b)=>(minutes.get(a.id)||0)-(minutes.get(b.id)||0)||Math.abs(a.quality-targetAvg)-Math.abs(b.quality-targetAvg)||a.name.localeCompare(b.name));
+  const chosen=[]; let i=0,j=s.length-1;
+  while(chosen.length<need&&i<=j){
+    const curAvg=chosen.length?chosen.reduce((x,p)=>x+p.quality,0)/chosen.length:targetAvg;
+    if(curAvg<targetAvg) chosen.push(s[j--]); else chosen.push(s[i++]);
+  }
+  return chosen;
+}
+function repairPositions(field,bench,keeper){
+  const need=['DEF','MID','ATT'];
+  const present=state.players.filter(p=>p.present&&p.id!==keeper.id);
+  const exists={}; present.forEach(p=>{ if(p.pos!=='ALL') exists[p.pos]=true; });
+  for(const pos of need){
+    if(!exists[pos]) continue;
+    const has=field.some(p=>p.pos===pos||p.pos==='ALL');
+    if(!has){
+      const cand=bench.find(p=>p.pos===pos)||bench.find(p=>p.pos==='ALL'); if(!cand) continue;
+      let idxOut=field.findIndex(p=>p.pos==='ALL'); if(idxOut===-1) idxOut=field.length-1;
+      const out=field[idxOut]; field[idxOut]=cand; const bi=bench.findIndex(p=>p.id===cand.id); bench[bi]=out;
+    }
+  }
+}
+function rankIndex(p){ const arr=[...state.players].sort((a,b)=>b.quality-a.quality); const i=arr.findIndex(x=>x.id===p.id); return (i<0)?999:i+1; }
+function enforceBenchSeparation(field, bench, lastBench, slotIndex, cooldownSlots){
+  if(bench.length<2) return {field,bench};
+  for(let i=0;i<bench.length;i++){
+    for(let j=i+1;j<bench.length;j++){
+      const ri=rankIndex(bench[i]), rj=rankIndex(bench[j]);
+      if(Math.abs(ri-rj)<2){
+        const better=(bench[i].quality>=bench[j].quality)?bench[i]:bench[j];
+        const swap=field.slice().sort((a,b)=>a.quality-b.quality)
+          .find(f=>!lastBench.has(f.id)||(slotIndex-lastBench.get(f.id)>=cooldownSlots));
+        if(swap){
+          field=field.filter(x=>x.id!==swap.id);
+          bench=bench.filter(x=>x.id!==better.id);
+          field.push(better); bench.push(swap);
+        }
+      }
+    }
+  }
+  return {field,bench};
+}
+
+const MIN_BENCH_GAP = 2;
+const COOLDOWN_SLOTS = MIN_BENCH_GAP+1; // =3
+let lastSchedule=[],curIndex=0;
+
+// bench-historie tot index
+function buildLastBenchMap(untilIndex){
+  const m = new Map();
+  const end = Math.min(untilIndex, lastSchedule.length);
+  for(let i=0;i<end;i++){
+    const sl=lastSchedule[i];
+    sl.bench.forEach(p => m.set(p.id, i));
+  }
+  return m;
+}
+
+function generateSchedule(fromIndex = 0, seedMinutes = null, seedLastBench = null){
+  const segs    = buildSegments();
+  const present = state.players.filter(p => p.present);
+  if (present.length < state.formation) { alert('Te weinig spelers aanwezig'); return []; }
+
+  const minutes = new Map(present.map(p => [p.id, 0]));
+  if (seedMinutes){
+    for (const [id, v] of seedMinutes.entries()){
+      if (minutes.has(id)) minutes.set(id, v);
+    }
+  }
+
+  const kcount    = new Map(present.map(p => [p.id, 0]));
+  const keeperKey = new Map();
+
+  const lastBench = new Map();
+  if (seedLastBench){
+    for (const [id, idx] of seedLastBench.entries()){
+      lastBench.set(id, idx);
+    }
+  }
+
+  for (let i = 0; i < segs.length; i++){
+    if (i < fromIndex) continue;
+    const seg = segs[i];
+    const key = (state.keeperCount === 1) ? 0
+             : (state.keeperCount === 2) ? (seg.q < state.quarters/2 ? 0 : 1)
+             : seg.q;
+    if (!keeperKey.has(key)){
+      const k = pickKeeper(present, minutes, kcount);
+      keeperKey.set(key, k);
+      kcount.set(k.id, (kcount.get(k.id) || 0) + 1);
+    }
+  }
+
+  const sched = [];
+  const targetAvg = present.reduce((s,p)=>s+p.quality,0)/present.length;
+
+  for (let i = 0; i < segs.length; i++){
+    const seg = segs[i];
+    const key = (state.keeperCount === 1) ? 0
+             : (state.keeperCount === 2) ? (seg.q < state.quarters/2 ? 0 : 1)
+             : seg.q;
+    const keeper = keeperKey.get(key);
+
+    let field = pickField(state.formation - 1, present.filter(p => p.id !== keeper.id), minutes, targetAvg);
+    let bench = present.filter(p => p.id !== keeper.id && !field.find(f => f.id === p.id));
+
+    const violators = bench.filter(p => lastBench.has(p.id) && (i - lastBench.get(p.id) < COOLDOWN_SLOTS));
+    if (violators.length){
+      for (const b of violators){
+        const swap = field.slice()
+          .sort((a,b2)=> a.quality - b2.quality || (minutes.get(b2.id)||0) - (minutes.get(a.id)||0))
+          .find(f => !lastBench.has(f.id) || (i - lastBench.get(f.id) >= COOLDOWN_SLOTS));
+        if (swap){
+          field = field.filter(x => x.id !== swap.id);
+          bench = bench.filter(x => x.id !== b.id);
+          field.push(b);
+          bench.push(swap);
+        }
+      }
+    }
+
+    ({field,bench} = enforceBenchSeparation(field,bench,lastBench,i,COOLDOWN_SLOTS));
+
+    const WANT_FIELD = state.formation - 1;
+    const WANT_BENCH = present.length - state.formation;
+
+    field = field.filter(p => p.id !== keeper.id);
+    bench = bench.filter(p => p.id !== keeper.id);
+
+    while (field.length > WANT_FIELD){
+      const worst = field.slice().sort((a,b)=>a.quality-b.quality)[0];
+      field = field.filter(x => x.id !== worst.id);
+      bench.push(worst);
+    }
+    while (field.length < WANT_FIELD && bench.length){
+      const best = bench.slice().sort((a,b)=>b.quality-a.quality)[0];
+      bench = bench.filter(x => x.id !== best.id);
+      field.push(best);
+    }
+    while (bench.length > WANT_BENCH){
+      const bestB  = bench.slice().sort((a,b)=>b.quality-a.quality)[0];
+      const worstF = field.slice().sort((a,b)=>a.quality-b.quality)[0];
+      bench = bench.filter(x => x.id !== bestB.id);
+      field = field.filter(x => x.id !== worstF.id);
+      field.push(bestB);
+      bench.push(worstF);
+    }
+    while (bench.length < WANT_BENCH){
+      const worstF = field.slice().sort((a,b)=>a.quality-b.quality)[0];
+      field = field.filter(x => x.id !== worstF.id);
+      bench.push(worstF);
+    }
+
+    repairPositions(field,bench,keeper);
+
+    minutes.set(keeper.id, (minutes.get(keeper.id) || 0) + seg.duration);
+    field.forEach(p => minutes.set(p.id, (minutes.get(p.id) || 0) + seg.duration));
+    bench.forEach(p => lastBench.set(p.id, i));
+
+    sched.push({ ...seg, keeper, field, bench });
+  }
+
+  lastSchedule = sched;
+  return sched;
+}
+
+function renderSchedule(s){
+  const tb=document.querySelector("#scheduleTable tbody"); tb.innerHTML='';
+  s.forEach(seg=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>Q${seg.q+1} • ${seg.s+1}</td><td>${pad2(seg.start)}–${pad2(seg.end)}m</td><td>${seg.keeper.name}</td><td>${seg.field.map(p=>p.name).join(', ')}</td><td>${seg.bench.map(p=>p.name).join(', ')}</td>`;
+    tb.appendChild(tr);
+  });
+  if(s.length){ setLive(0); populateChangesUI(0); }
+}
+
+function setLive(i){
+  const seg=lastSchedule[i]; if(!seg) return;
+  $('liveKeeper').textContent=seg.keeper.name;
+  $('liveField').textContent=seg.field.map(p=>p.name).join(', ');
+  $('liveBench').textContent=seg.bench.map(p=>p.name).join(', ');
+  curIndex=i; const spq=Math.ceil(state.minsPerQuarter/state.subInterval);
+  $('qLabel').textContent='Kwart '+(Math.floor(i/spq)+1)+'/'+state.quarters;
+}
+
+function populateChangesUI(i){
+  const seg=lastSchedule[i]; if(!seg) return; const all=state.players.filter(p=>p.present);
+  $('liveKeeperSelect').innerHTML=all.map(p=>`<option value="${p.id}"${p.id===seg.keeper.id?' selected':''}>${p.name}</option>`).join('');
+  $('stopPlayerSelect').innerHTML=all.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const fe=$('liveFieldEdit'); fe.innerHTML='';
+  seg.field.forEach(p=>{ const chip=document.createElement('span'); chip.className='chip'; chip.textContent=p.name; chip.onclick=()=>{ seg.field=seg.field.filter(x=>x.id!==p.id); seg.bench.push(p); setLive(i); populateChangesUI(i); }; fe.appendChild(chip); });
+  const be=$('liveBenchEdit'); be.innerHTML='';
+  seg.bench.forEach(p=>{ const chip=document.createElement('span'); chip.className='chip'; chip.textContent=p.name; chip.onclick=()=>{ if(seg.field.length<state.formation-1){ seg.bench=seg.bench.filter(x=>x.id!==p.id); seg.field.push(p); setLive(i); populateChangesUI(i); } }; be.appendChild(chip); });
+}
+
+/* Timer & herberekenen vanaf NU */
+let timer=null,startMs=0,elapsed=0;
+function tick(){
+  const now=performance.now(); elapsed=(now-startMs)/1000; $('elapsed').textContent=fmt(elapsed);
+  const step=state.subInterval*60; const next=(Math.ceil(elapsed/step)*step)-elapsed; $('toNext').textContent=fmt(Math.max(0,next));
+  const prevSlot=Math.floor((elapsed-0.25)/step), curSlot=Math.floor(elapsed/step);
+  if(curSlot>prevSlot){ const idx=Math.min(curSlot,lastSchedule.length-1); setLive(idx); populateChangesUI(idx); vibrate([200,100,200]); }
+}
+function getTimeProgress(){
+  const stepSec = state.subInterval * 60;
+  const curSlot = Math.min(Math.floor(elapsed / stepSec), Math.max(0, lastSchedule.length - 1));
+  const slotElapsedSec = Math.max(0, elapsed - curSlot * stepSec);
+  return { curSlot, slotElapsedSec, stepSec };
+}
+function buildSeedMinutes(untilIndex, includePartial){
+  const m = new Map();
+  const end = Math.min(untilIndex, lastSchedule.length);
+  for (let i = 0; i < end; i++){
+    const sl = lastSchedule[i], d = sl.duration;
+    m.set(sl.keeper.id, (m.get(sl.keeper.id)||0) + d);
+    sl.field.forEach(pl => m.set(pl.id, (m.get(pl.id)||0) + d));
+  }
+  if (includePartial && lastSchedule[untilIndex]){
+    const sl = lastSchedule[untilIndex];
+    const { slotElapsedSec } = getTimeProgress();
+    const add = Math.min(sl.duration, Math.max(0, slotElapsedSec / 60));
+    m.set(sl.keeper.id, (m.get(sl.keeper.id)||0) + add);
+    sl.field.forEach(pl => m.set(pl.id, (m.get(pl.id)||0) + add));
+  }
+  return m;
+}
+function buildLastBenchMap(untilIndex){
+  const m = new Map();
+  const end = Math.min(untilIndex, lastSchedule.length);
+  for(let i=0;i<end;i++){
+    lastSchedule[i].bench.forEach(p => m.set(p.id, i));
+  }
+  return m;
+}
+function recalcFromNow(){
+  if (!lastSchedule || !lastSchedule.length) return;
+  const { curSlot } = getTimeProgress();
+  const seedMin   = buildSeedMinutes(curSlot, true);
+  const seedBench = buildLastBenchMap(curSlot);
+  const s = generateSchedule(curSlot, seedMin, seedBench);
+  lastSchedule = lastSchedule.slice(0, curSlot).concat(s.slice(curSlot));
+  renderSchedule(lastSchedule);
+  setLive(curSlot);
+  populateChangesUI(curSlot);
+}
+
+/* Wijzigingen-acties (Toepassen = Herberekenen) */
+function onApplyKeeper(){
+  if (!lastSchedule || !lastSchedule.length) return;
+  const { curSlot } = getTimeProgress();
+  const seg = lastSchedule[curSlot];
+  const id = $('liveKeeperSelect').value;
+  const found = state.players.find(p => p.id === id && p.present);
+  if (found){
+    seg.field = seg.field.filter(p => p.id !== found.id);
+    const present = state.players.filter(p => p.present);
+    seg.bench = present.filter(p => p.id !== found.id && !seg.field.find(f => f.id === p.id));
+    seg.keeper = found;
+  }
+  recalcFromNow(); // << gelijk aan Herbereken
+}
+function onStopPlayer(){
+  if (!lastSchedule || !lastSchedule.length) return;
+  const id = $('stopPlayerSelect').value;
+  const p = state.players.find(x => x.id === id);
+  if (!p) return;
+  p.present = false;
+  const { curSlot } = getTimeProgress();
+  const seg = lastSchedule[curSlot];
+  if (seg){
+    if (seg.keeper && seg.keeper.id === p.id){
+      const pool = state.players.filter(x => x.present && !seg.field.find(f => f.id === x.id));
+      if (pool.length) seg.keeper = pool[0];
+    }
+    seg.field = seg.field.filter(x => x.id !== p.id);
+    seg.bench = seg.bench.filter(x => x.id !== p.id);
+  }
+  save();
+  recalcFromNow();
+}
+$('applyLiveBtn').onclick  = onApplyKeeper;
+$('stopPlayerBtn').onclick = onStopPlayer;
+$('recalcBtn').onclick     = recalcFromNow;
+
+/* Genereer & timer knoppen */
+$('generateBtn').onclick=()=>{ const s=generateSchedule(0,null,null); renderSchedule(s); location.hash='#live'; };
+$('startBtn').onclick=()=>{ if(!lastSchedule.length){ alert('Genereer eerst een schema.'); return; } if(!timer){ startMs=performance.now()-elapsed*1000; timer=setInterval(tick,250);} };
+$('pauseBtn').onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } };
+$('resetBtnQ').onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } elapsed=0; $('elapsed').textContent='00:00'; $('toNext').textContent='--:--'; const spq=Math.ceil(state.minsPerQuarter/state.subInterval); setLive(Math.floor(curIndex/spq)*spq); populateChangesUI(curIndex); };
+$('subNowBtn').onclick=()=>{ if(!lastSchedule.length) return; curIndex=Math.min(curIndex+1,lastSchedule.length-1); setLive(curIndex); populateChangesUI(curIndex); vibrate([150,80,150]); };
+</script>
+</body>
+</html>
 
