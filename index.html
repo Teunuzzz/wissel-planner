@@ -124,7 +124,7 @@
     <section><h2>Snelle wijzigingen</h2><div class="content">
       <div class="row">
         <select id="liveKeeperSelect"></select>
-        <button id="applyLiveBtn" class="ghost" type="button">✅ Toepassen</button>
+        <button id="applyLiveBtn" type="button">✅ Toepassen</button>
       </div>
       <div class="row small"><b>Op veld:</b><div id="liveFieldEdit" class="lineup"></div></div>
       <div class="row small"><b>Bank:</b><div id="liveBenchEdit" class="lineup"></div></div>
@@ -375,47 +375,91 @@ const MIN_BENCH_GAP = 2;                 // min. 2 slots ertussen
 const COOLDOWN_SLOTS = MIN_BENCH_GAP+1;  // earliest herbench = vorige bench + 3
 let lastSchedule=[],curIndex=0;
 
-function generateSchedule(fromIndex=0,seedMinutes=null){
-  const segs=buildSegments(), present=state.players.filter(p=>p.present);
-  if(present.length<state.formation){ alert('Te weinig spelers aanwezig'); return []; }
+// Bouw een seed van "laatste bank-slot" per speler tot aan untilIndex-1
+function buildLastBenchMap(untilIndex){
+  const m = new Map();
+  const end = Math.min(untilIndex, lastSchedule.length);
+  for (let i = 0; i < end; i++){
+    const sl = lastSchedule[i];
+    sl.bench.forEach(p => m.set(p.id, i));
+  }
+  return m;
+}
+  
 
-  const minutes=new Map(present.map(p=>[p.id,0]));
-  if(seedMinutes){ for(const [id,v] of seedMinutes.entries()) if(minutes.has(id)) minutes.set(id,v); }
-  const kcount=new Map(present.map(p=>[p.id,0])); const keeperKey=new Map();
+// fromIndex: startslot om te herplannen
+// seedMinutes: Map(playerId => al-gespeelde minuten)
+// seedLastBench: Map(playerId => laatst-gebankte slotindex)
+function generateSchedule(fromIndex = 0, seedMinutes = null, seedLastBench = null){
+  const segs    = buildSegments();
+  const present = state.players.filter(p => p.present);
+  if (present.length < state.formation) { alert('Te weinig spelers aanwezig'); return []; }
 
-  // verdeel keepers per deel
-  for(let i=0;i<segs.length;i++){
-    if(i<fromIndex) continue;
-    const seg=segs[i];
-    const key=(state.keeperCount===1)?0:(state.keeperCount===2?(seg.q<state.quarters/2?0:1):seg.q);
-    if(!keeperKey.has(key)){
-      const k=pickKeeper(present,minutes,kcount);
-      keeperKey.set(key,k); kcount.set(k.id,(kcount.get(k.id)||0)+1);
+  // minuten-seed
+  const minutes = new Map(present.map(p => [p.id, 0]));
+  if (seedMinutes){
+    for (const [id, v] of seedMinutes.entries()){
+      if (minutes.has(id)) minutes.set(id, v);
     }
   }
 
-  const lastBench=new Map(); const sched=[];
-  const targetAvg=present.reduce((s,p)=>s+p.quality,0)/present.length;
+  // keeper-per-deel bookkeeping
+  const kcount    = new Map(present.map(p => [p.id, 0]));
+  const keeperKey = new Map();
 
-  for(let i=0;i<segs.length;i++){
-    const seg=segs[i];
-    const key=(state.keeperCount===1)?0:(state.keeperCount===2?(seg.q<state.quarters/2?0:1):seg.q);
-    const keeper=keeperKey.get(key);
+  // bench-geschiedenis (cooldown) seeden
+  const lastBench = new Map();
+  if (seedLastBench){
+    for (const [id, idx] of seedLastBench.entries()){
+      lastBench.set(id, idx);
+    }
+  }
 
-    // 1) initiele keuze op fairness/kwaliteit
-    let field=pickField(state.formation-1, present.filter(p=>p.id!==keeper.id), minutes, targetAvg);
-    let bench=present.filter(p=>p.id!==keeper.id && !field.find(f=>f.id===p.id));
+  // Preselecteer keeper per deel (wedstrijd/helft/kwart)
+  for (let i = 0; i < segs.length; i++){
+    if (i < fromIndex) continue;
+    const seg = segs[i];
+    const key = (state.keeperCount === 1) ? 0
+             : (state.keeperCount === 2) ? (seg.q < state.quarters/2 ? 0 : 1)
+             : seg.q; // per kwart
+    if (!keeperKey.has(key)){
+      const k = pickKeeper(present, minutes, kcount);
+      keeperKey.set(key, k);
+      kcount.set(k.id, (kcount.get(k.id) || 0) + 1);
+    }
+  }
 
-    // 2) HARD CONSTRAINT: cooldown afdwingen (min. 2 slots tussen bank)
+  const sched = [];
+  const targetAvg = present.reduce((s,p)=>s+p.quality,0)/present.length;
+
+  for (let i = 0; i < segs.length; i++){
+    const seg = segs[i];
+    const key = (state.keeperCount === 1) ? 0
+             : (state.keeperCount === 2) ? (seg.q < state.quarters/2 ? 0 : 1)
+             : seg.q;
+    const keeper = keeperKey.get(key);
+
+    // 1) initiele keuze (fairness/kwaliteit)
+    let field = pickField(
+      state.formation - 1,
+      present.filter(p => p.id !== keeper.id),
+      minutes,
+      targetAvg
+    );
+    let bench = present.filter(p => p.id !== keeper.id && !field.find(f => f.id === p.id));
+
+    // 2) HARD: cooldown afdwingen (min. 2 slots gat)
+    const COOLDOWN_SLOTS = 3; // = min 2 ertussen
     const violators = bench.filter(p => lastBench.has(p.id) && (i - lastBench.get(p.id) < COOLDOWN_SLOTS));
-    if(violators.length){
-      for(const b of violators){
-        // ruil met veldspeler die cooldown wél haalt (kies zwakste/hoogste minuten)
-        const swap = field.slice().sort((a,b2)=>a.quality-b2.quality || (minutes.get(b2.id)||0)-(minutes.get(a.id)||0))
+    if (violators.length){
+      for (const b of violators){
+        // ruil met zwakste veldspeler die cooldown wél haalt
+        const swap = field.slice()
+          .sort((a,b2)=> a.quality - b2.quality || (minutes.get(b2.id)||0) - (minutes.get(a.id)||0))
           .find(f => !lastBench.has(f.id) || (i - lastBench.get(f.id) >= COOLDOWN_SLOTS));
-        if(swap){
-          field = field.filter(x=>x.id!==swap.id);
-          bench = bench.filter(x=>x.id!==b.id);
+        if (swap){
+          field = field.filter(x => x.id !== swap.id);
+          bench = bench.filter(x => x.id !== b.id);
           field.push(b);
           bench.push(swap);
         }
@@ -423,31 +467,55 @@ function generateSchedule(fromIndex=0,seedMinutes=null){
     }
 
     // 3) Kwaliteitslaag: toppers niet samen op bank (zonder cooldown te breken)
-    ({field,bench} = enforceBenchSeparation(field,bench,lastBench,i,COOLDOWN_SLOTS));
+    ({ field, bench } = enforceBenchSeparation(field, bench, lastBench, i, COOLDOWN_SLOTS));
 
-    // 4) Safety + aantallen forceren
-    const WANT_FIELD=state.formation-1;
-    const WANT_BENCH=present.length - state.formation;
-    field=field.filter(p=>p.id!==keeper.id);
-    bench=bench.filter(p=>p.id!==keeper.id);
+    // 4) Safety + aantallen
+    const WANT_FIELD = state.formation - 1;
+    const WANT_BENCH = present.length - state.formation;
 
-    while(field.length>WANT_FIELD){ const worst=field.slice().sort((a,b)=>a.quality-b.quality)[0]; field=field.filter(x=>x.id!==worst.id); bench.push(worst); }
-    while(field.length<WANT_FIELD && bench.length){ const best=bench.slice().sort((a,b)=>b.quality-a.quality)[0]; bench=bench.filter(x=>x.id!==best.id); field.push(best); }
-    while(bench.length>WANT_BENCH){ const bestB=bench.slice().sort((a,b)=>b.quality-a.quality)[0]; const worstF=field.slice().sort((a,b)=>a.quality-b.quality)[0]; bench=bench.filter(x=>x.id!==bestB.id); field=field.filter(x=>x.id!==worstF.id); field.push(bestB); bench.push(worstF); }
-    while(bench.length<WANT_BENCH){ const worstF=field.slice().sort((a,b)=>a.quality-b.quality)[0]; field=field.filter(x=>x.id!==worstF.id); bench.push(worstF); }
+    // (extra safety) keeper nooit in field/bank
+    field = field.filter(p => p.id !== keeper.id);
+    bench = bench.filter(p => p.id !== keeper.id);
 
-    // 5) Posities (laagste prioriteit; zachte poging)
-    repairPositions(field,bench,keeper);
+    while (field.length > WANT_FIELD){
+      const worst = field.slice().sort((a,b)=>a.quality-b.quality)[0];
+      field = field.filter(x => x.id !== worst.id);
+      bench.push(worst);
+    }
+    while (field.length < WANT_FIELD && bench.length){
+      const best = bench.slice().sort((a,b)=>b.quality-a.quality)[0];
+      bench = bench.filter(x => x.id !== best.id);
+      field.push(best);
+    }
+    while (bench.length > WANT_BENCH){
+      const bestB  = bench.slice().sort((a,b)=>b.quality-a.quality)[0];
+      const worstF = field.slice().sort((a,b)=>a.quality-b.quality)[0];
+      bench = bench.filter(x => x.id !== bestB.id);
+      field = field.filter(x => x.id !== worstF.id);
+      field.push(bestB);
+      bench.push(worstF);
+    }
+    while (bench.length < WANT_BENCH){
+      const worstF = field.slice().sort((a,b)=>a.quality-b.quality)[0];
+      field = field.filter(x => x.id !== worstF.id);
+      bench.push(worstF);
+    }
 
-    // minuten en bench-telling
-    minutes.set(keeper.id,(minutes.get(keeper.id)||0)+seg.duration);
-    field.forEach(p=> minutes.set(p.id,(minutes.get(p.id)||0)+seg.duration));
-    bench.forEach(p=> lastBench.set(p.id,i));
+    // 5) Posities (laagste prioriteit, zachte swap)
+    repairPositions(field, bench, keeper);
 
-    sched.push({...seg,keeper,field,bench});
+    // minuten + bench-history updaten
+    minutes.set(keeper.id, (minutes.get(keeper.id) || 0) + seg.duration);
+    field.forEach(p => minutes.set(p.id, (minutes.get(p.id) || 0) + seg.duration));
+    bench.forEach(p => lastBench.set(p.id, i));
+
+    sched.push({ ...seg, keeper, field, bench });
   }
-  lastSchedule=sched; return sched;
+
+  lastSchedule = sched;
+  return sched;
 }
+
 
 function renderSchedule(s){
   const tb=document.querySelector("#scheduleTable tbody"); tb.innerHTML='';
@@ -543,14 +611,20 @@ function buildSeedMinutes(untilIndex, includePartial){
 function recalcFromNow(){
   if (!lastSchedule || !lastSchedule.length) return;
   const { curSlot } = getTimeProgress();
-  const seed = buildSeedMinutes(curSlot, true); // tel deel van huidig slot mee
-  const s = generateSchedule(curSlot, seed);
-  // vast gedeelte behouden, rest vervangen
+
+  // minuten tot nu (incl. deel van huidig slot)
+  const seedMin   = buildSeedMinutes(curSlot, true);
+  // bench-geschiedenis tot nu
+  const seedBench = buildLastBenchMap(curSlot);
+
+  const s = generateSchedule(curSlot, seedMin, seedBench);
+
   lastSchedule = lastSchedule.slice(0, curSlot).concat(s.slice(curSlot));
   renderSchedule(lastSchedule);
   setLive(curSlot);
   populateChangesUI(curSlot);
 }
+
 
 // 2) Nieuwe handlers die de rest van de wedstrijd herberekenen
 
