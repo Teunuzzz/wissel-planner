@@ -140,6 +140,16 @@ function ensureDefaults(){
 function presentPlayers(){return state.players.filter(p=>p.present)}
 function nameBy(id){const p=state.players.find(x=>x.id===id); return p?p.name:'—'}
 function playerBy(id){return state.players.find(x=>x.id===id)}
+function rankIndex(id){return state.players.findIndex(p=>p.id===id)}
+function violatesQualityGap(arr){
+  if(!arr||arr.length<2) return false;
+  for(let i=0;i<arr.length;i++){
+    for(let j=i+1;j<arr.length;j++){
+      if(Math.abs(rankIndex(arr[i]) - rankIndex(arr[j])) < 3) return true;
+    }
+  }
+  return false;
+}
 function keeperFor(q){return state.keeperByQuarter[q-1]}
 
 function keeperAssignUI(containerId,prefix){
@@ -188,24 +198,42 @@ function recomputeAll(){
   state.viewQ=state.q; state.swappedThisQuarter=false; state.elapsedMs=0; save();
 }
 function buildSlot(q,slot,k,prevField){
-  const all=presentPlayers().map(p=>p.id).filter(id=>id!==k);
-  // mustPlay: players with benchCd>0 cannot be benched now
-  const mustPlay=all.filter(id=>playerBy(id).benchCd>0);
-  let field=mustPlay.slice();
-  // fill remaining seats with lowest minutes (tie-breaker by original order)
+  const all = presentPlayers().map(p=>p.id).filter(id=>id!==k);
+  // players who were benched in previous slot must play now
+  const mustPlay = all.filter(id=>playerBy(id).benchCd>0);
+  let field = mustPlay.slice();
   const remainingSeats = Math.max(0, state.formation - field.length);
   const needFrom = all.filter(id=>!field.includes(id)).sort((a,b)=>{
-    const da=state.plannedMinutes[a], db=state.plannedMinutes[b];
+    const da=state.plannedMinutes[a]||0, db=state.plannedMinutes[b]||0;
     if(da!==db) return da-db;
-    // tiebreaker: original order in state.players
-    return state.players.findIndex(p=>p.id===a) - state.players.findIndex(p=>p.id===b);
+    return rankIndex(a)-rankIndex(b);
   }).slice(0,remainingSeats);
   field = field.concat(needFrom);
-  // bench = others
-  const bench = all.filter(id=>!field.includes(id));
-  // cooldown bookkeeping: those benched now get cd=1 next slot, others 0
-  if(slot===1){/* nothing yet, will be set after minutes */}
-  // compute swap lists compared to prevField (for readability; used in dist and overlay)
+  let bench = all.filter(id=>!field.includes(id));
+
+  // Enforce quality gap on bench: any pair must differ >= 3 ranks
+  if(violatesQualityGap(bench)){
+    // try to swap a bench player with a field player (that is not mustPlay)
+    const fieldSwapCandidates = field.filter(id=>!mustPlay.includes(id)).sort((a,b)=>{
+      // prefer swapping out the most-played field player
+      const da=state.plannedMinutes[b]-state.plannedMinutes[a];
+      if(da!==0) return da;
+      return rankIndex(b)-rankIndex(a);
+    });
+    // iterate bench members and swap with best field candidate that fixes violation
+    outer: for(const bId of bench.slice()){
+      for(const fId of fieldSwapCandidates){
+        const newField = field.map(x=>x===fId?bId:x);
+        const newBench = bench.map(x=>x===bId?fId:x);
+        if(!violatesQualityGap(newBench)){
+          field = newField; bench = newBench;
+          break outer;
+        }
+      }
+    }
+  }
+
+  // compute swap lists compared to prevField for readability
   let out=[],inn=[];
   if(prevField){
     out = prevField.filter(id=>!field.includes(id));
