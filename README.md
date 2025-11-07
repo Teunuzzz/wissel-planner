@@ -1,4 +1,4 @@
-# ⚽ Wissel Planner O9 – ZVV De Esch (v2.3.8)
+# ⚽ Wissel Planner O9 – ZVV De Esch (v2.3.12)
 
 - Basis 8 automatisch aanwezig (éénmalig) met verborgen ranking: **Dani, Twan, Sydney, Ryan, Finn, Diede, Milan, Wouter**.
 - Drag & drop bepaalt kwaliteit (onzichtbaar), gebruikt in eerlijke verdeling.
