@@ -244,7 +244,48 @@ function keeperPool(pl){ if(state.keeperPolicy==='any') return pl; if(state.keep
 function pickKeeper(pl,minutes,kcount){ const pool=keeperPool(pl); return [...pool].sort((a,b)=>(kcount.get(a.id)||0)-(kcount.get(b.id)||0)||(minutes.get(a.id)||0)-(minutes.get(b.id)||0)||a.quality-b.quality)[0]; }
 function pickField(need,avail,minutes,targetAvg){ const s=[...avail].sort((a,b)=>(minutes.get(a.id)||0)-(minutes.get(b.id)||0)||Math.abs(a.quality-targetAvg)-Math.abs(b.quality-targetAvg)||a.name.localeCompare(b.name)); const chosen=[]; let i=0,j=s.length-1; while(chosen.length<need&&i<=j){ const curAvg=chosen.length?chosen.reduce((x,p)=>x+p.quality,0)/chosen.length:targetAvg; if(curAvg<targetAvg) chosen.push(s[j--]); else chosen.push(s[i++]); } return chosen; }
 function repairPositions(field,bench,keeper){ const need=['DEF','MID','ATT']; const present=state.players.filter(p=>p.present&&p.id!==keeper.id); const exists={}; present.forEach(p=>{ if(p.pos!=='ALL') exists[p.pos]=true; }); for(const pos of need){ if(!exists[pos]) continue; const has=field.some(p=>p.pos===pos||p.pos==='ALL'); if(!has){ const cand=bench.find(p=>p.pos===pos)||bench.find(p=>p.pos==='ALL'); if(!cand) continue; let idxOut=field.findIndex(p=>p.pos==='ALL'); if(idxOut===-1) idxOut=field.length-1; const out=field[idxOut]; field[idxOut]=cand; const bi=bench.findIndex(p=>p.id===cand.id); bench[bi]=out; } } }
+// Huidige rang op basis van quality (drag bepaalt quality).
+// best = 1, daarna 2, 3, ...
+function rankIndex(p){
+  const arr = [...state.players].sort((a,b)=>b.quality - a.quality);
+  const i = arr.findIndex(x=>x.id===p.id);
+  return (i<0) ? 999 : i+1;
+}
 
+// Zorgt dat bankspelers minstens 2 rangen uit elkaar liggen.
+// Probeert de betere bankspeler naar het veld te swappen met de
+// laagste-kwaliteit veldspeler die aan cooldown voldoet.
+function enforceBenchSeparation(field, bench, lastBench, slotIndex){
+  if (bench.length < 2) return { field, bench };
+
+  // Check alle paren op de bank
+  for (let i=0;i<bench.length;i++){
+    for (let j=i+1;j<bench.length;j++){
+      const ri = rankIndex(bench[i]);
+      const rj = rankIndex(bench[j]);
+      if (Math.abs(ri - rj) < 2) {
+        // Kies de betere bankspeler om het veld in te brengen
+        const better = (bench[i].quality >= bench[j].quality) ? bench[i] : bench[j];
+
+        // Kies zwakste veldspeler die cooldown niet schendt
+        const swap = field
+          .slice()
+          .sort((a,b)=>a.quality - b.quality)
+          .find(f => !lastBench.has(f.id) || (slotIndex - lastBench.get(f.id) >= BENCH_COOLDOWN));
+
+        if (swap){
+          // Voer de wissel uit
+          field = field.filter(x=>x.id!==swap.id);
+          bench = bench.filter(x=>x.id!==better.id);
+          field.push(better);
+          bench.push(swap);
+        }
+      }
+    }
+  }
+  return { field, bench };
+}
+  
 const BENCH_COOLDOWN=3; // min 2 slots ertussen
 let lastSchedule=[],curIndex=0;
 
@@ -282,18 +323,23 @@ let bench = present.filter(p => p.id !== keeper.id && !field.find(f => f.id === 
 const bad = bench.filter(p =>
   p.id !== keeper.id && lastBench.has(p.id) && (i - lastBench.get(p.id) < BENCH_COOLDOWN)
 );
-    if(bad.length){
-      for(const b of bad){
-        const sw = field.find(f=> !lastBench.has(f.id) || (i - lastBench.get(f.id) >= BENCH_COOLDOWN) );
-        if(sw){
-          field = field.filter(x=>x.id!==sw.id);
-          bench = bench.filter(x=>x.id!==b.id);
-          field.push(b);
-          bench.push(sw);
-        }
-      }
+    const bad = bench.filter(p =>
+  p.id !== keeper.id && lastBench.has(p.id) && (i - lastBench.get(p.id) < BENCH_COOLDOWN)
+);
+if (bad.length){
+  for (const b of bad){
+    const sw = field.find(f => !lastBench.has(f.id) || (i - lastBench.get(f.id) >= BENCH_COOLDOWN));
+    if (sw){
+      field = field.filter(x=>x.id!==sw.id);
+      bench = bench.filter(x=>x.id!==b.id);
+      field.push(b);
+      bench.push(sw);
     }
-
+  }
+}
+// Bench-scheiding: toppers niet tegelijk wissel (min 2 rangen ertussen)
+({ field, bench } = enforceBenchSeparation(field, bench, lastBench, i));
+    
     repairPositions(field,bench,keeper);
 
     minutes.set(keeper.id,(minutes.get(keeper.id)||0)+seg.duration);
