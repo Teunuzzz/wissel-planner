@@ -1,2 +1,1 @@
-self.addEventListener('install',e=>{e.waitUntil(caches.open('wissel-v7').then(c=>c.addAll(['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'])))});
-self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))})
+{"name": "Wisselplanner", "short_name": "Wisselplanner", "start_url": "./index.html", "display": "standalone", "background_color": "#0b1220", "theme_color": "#0b1220", "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}]}
