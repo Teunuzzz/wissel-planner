@@ -191,27 +191,104 @@ function renderPlayers(){
 }
 
 function enableDrag(){
-  const list=$('playerList'); let drag=null, startY=0, ph=null;
-  list.querySelectorAll('.handle').forEach(h=>{
-    const item=h.closest('.player');
-    h.onpointerdown=(e)=>{ e.preventDefault(); drag=item; startY=e.clientY;
-      ph=document.createElement('div'); ph.style.height=item.offsetHeight+'px'; ph.style.border='2px dashed #f5d02e'; ph.style.borderRadius='12px';
-      item.after(ph); item.style.position='absolute'; item.style.width=item.offsetWidth+'px'; item.style.zIndex=5; h.setPointerCapture(e.pointerId);
-    };
-    h.onpointermove=(e)=>{ if(!drag) return; const dy=e.clientY-startY; drag.style.transform=`translateY(${dy}px)`;
-      const children=[...list.children].filter(x=>x!==drag && x!==ph);
-      for(const el of children){ const r=el.getBoundingClientRect();
-        if(e.clientY<r.top+r.height/2){ list.insertBefore(ph,el); break; } else { list.appendChild(ph); } }
-    };
-    h.onpointerup=()=>{ if(!drag) return; drag.style.position=''; drag.style.transform='';
-      ph.replaceWith(drag);
-      const newIdx=[...list.children].indexOf(drag);
-      const id=drag.dataset.id;
-      const oldIdx=state.players.findIndex(p=>p.id===id);
-      const [m]=state.players.splice(oldIdx,1);
-      state.players.splice(newIdx,0,m);
-      renum(); save(); drag=null; ph=null; vibrate([10]);
-    };
+  const list = $('playerList');
+  let drag = null, ph = null, startY = 0, startRect = null;
+
+  // Opruimen en volgorde in state zetten
+  function dropAtPlaceholder(){
+    if (!drag || !ph) return;
+    // plaats het element definitief
+    ph.replaceWith(drag);
+    // herstel styles
+    drag.style.position = '';
+    drag.style.width = '';
+    drag.style.left = '';
+    drag.style.top = '';
+    drag.style.zIndex = '';
+    drag.style.transform = '';
+
+    // nieuwe index bepalen
+    const newIdx = [...list.children].indexOf(drag);
+    const id = drag.dataset.id;
+    const oldIdx = state.players.findIndex(p=>p.id===id);
+    const [m] = state.players.splice(oldIdx, 1);
+    state.players.splice(newIdx, 0, m);
+    renum(); save(); vibrate([10]);
+
+    drag = null; ph = null; startRect = null;
+  }
+
+  function onMove(e){
+    if (!drag) return;
+    e.preventDefault();
+
+    const y = e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
+    const dy = y - startY;
+    drag.style.transform = `translateY(${dy}px)`;
+
+    // auto-scroll bij randen
+    const margin = 80;
+    if (y < margin) window.scrollBy(0, -12);
+    if (y > window.innerHeight - margin) window.scrollBy(0, 12);
+
+    // placeholder positie bepalen
+    const items = [...list.children].filter(x => x !== drag && x !== ph);
+    for (const el of items){
+      const r = el.getBoundingClientRect();
+      if (y < r.top + r.height/2) { list.insertBefore(ph, el); return; }
+    }
+    list.appendChild(ph);
+  }
+
+  function onUpOrCancel(){
+    if (!drag) return;
+    dropAtPlaceholder();
+    // listeners loskoppelen
+    document.removeEventListener('pointermove', onMove, {passive:false});
+    document.removeEventListener('pointerup', onUpOrCancel, {passive:false});
+    document.removeEventListener('pointercancel', onUpOrCancel, {passive:false});
+    document.removeEventListener('touchmove', onMove, {passive:false});
+    document.removeEventListener('touchend', onUpOrCancel, {passive:false});
+    document.removeEventListener('touchcancel', onUpOrCancel, {passive:false});
+  }
+
+  // Koppel per handle
+  list.querySelectorAll('.handle').forEach(handle=>{
+    const item = handle.closest('.player');
+
+    handle.addEventListener('pointerdown', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      // voorkom meerdere placeholders
+      if (drag) onUpOrCancel();
+
+      drag = item;
+      startY = e.clientY;
+      const r = item.getBoundingClientRect();
+      startRect = r;
+
+      // placeholder
+      ph = document.createElement('div');
+      ph.style.height = r.height + 'px';
+      ph.style.border = '2px dashed #f5d02e';
+      ph.style.borderRadius = '12px';
+      item.after(ph);
+
+      // zwevend maken
+      item.style.position = 'fixed';
+      item.style.width = r.width + 'px';
+      item.style.left = r.left + 'px';
+      item.style.top  = r.top + 'px';
+      item.style.zIndex = 1000;
+
+      // document-brede listeners (betrouwbaar op iOS)
+      document.addEventListener('pointermove', onMove, {passive:false});
+      document.addEventListener('pointerup', onUpOrCancel, {passive:false});
+      document.addEventListener('pointercancel', onUpOrCancel, {passive:false});
+      // fallback voor oudere iOS
+      document.addEventListener('touchmove', onMove, {passive:false});
+      document.addEventListener('touchend', onUpOrCancel, {passive:false});
+      document.addEventListener('touchcancel', onUpOrCancel, {passive:false});
+    }, {passive:false});
   });
 }
 
