@@ -82,25 +82,57 @@ button{background:var(--accent)}button.ghost{background:transparent}
 <script>
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(console.error)); }
 const storeKey='wisselplanner_state_mobile_team';
-const RANK_ORDER=["Dani","Twan","Sydney","Ryan","Finn","Diede","Milan","Wouter"]; // best -> worst
+const RANK_ORDER = ["Dani","Twan","Sydney","Ryan","Finn","Diede","Milan","Wouter"]; // best -> worst
 const POS_LABEL={ALL:'All',DEF:'Verd',MID:'Mid',ATT:'Aanv'};
 function $(id){return document.getElementById(id)}; function pad2(n){return String(n).padStart(2,'0')}; function fmt(sec){const m=Math.floor(sec/60),s=Math.floor(sec%60);return pad2(m)+':'+pad2(s)}; function vibrate(p){try{if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
 function uid(){return (crypto.randomUUID?crypto.randomUUID():'id-'+Math.random().toString(36).slice(2))}
 
 let state=null;try{state=JSON.parse(localStorage.getItem(storeKey)||'null')}catch(e){state=null}
 function initBase8(){
-  const arr=RANK_ORDER.map((n,i)=>({id:uid(),name:n,pos:'ALL',present:true,keeperCandidate:(n in {Sydney:1,Dani:1,Twan:1}),quality:RANK_ORDER.length-i}));
-  return {players:arr,quarters:4,minsPerQuarter:10,subInterval:5,formation:6,keeperCount:1,keeperPolicy:'prefer',strict:false};
+  const keeperSet = new Set(["Dani","Twan","Sydney"]);     // pas aan naar wens
+  const arr = RANK_ORDER.map((n,i)=>({
+    id: uid(),
+    name: n,
+    pos: 'ALL',
+    present: true,
+    keeperCandidate: keeperSet.has(n),
+    quality: RANK_ORDER.length - i   // hoger = beter; wordt bij drag&drop opnieuw berekend
+  }));
+  return {
+    players: arr,
+    quarters: 4, minsPerQuarter: 10, subInterval: 5,
+    formation: 6, keeperCount: 1, keeperPolicy: 'prefer',
+    strict: false
+  };
 }
 if(!state || !Array.isArray(state.players) || state.players.length===0){
   state = initBase8();
   localStorage.setItem(storeKey, JSON.stringify(state));
+}
+// ==== STATE LADEN (met robuuste fallback) ====
+let state = null;
+try { state = JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch(e) { state = null; }
+
+// 1) Eerste keer of lege spelerslijst → basis 8
+if (!state || !Array.isArray(state.players) || state.players.length === 0) {
+  state = initBase8();
+  save();  
+// 2) Noodknop via URL: .../index.html?force8
+const FORCE8 = new URLSearchParams(location.search).has('force8');
+if (FORCE8) { state = initBase8(); save(); }
+
+// 3) (Optioneel) Corrigeer “kapotte” namen
+if (state && Array.isArray(state.players) && state.players.some(p => !p || !p.name)) {
+  state = initBase8(); save();
 }
 
 // helpers
 function save(){ localStorage.setItem(storeKey, JSON.stringify(state)); refreshSummaries(); }
 function refreshSummaries(){ const present=state.players.filter(p=>p.present); $('presenceSummary').textContent=present.length+' aanwezig'; $('benchSummary').textContent='bench '+Math.max(0,present.length-state.formation); }
 function renum(){ const n=state.players.length; state.players.forEach((p,i)=> p.quality = (n-i)); }
+function $(id){return document.getElementById(id)}
+function uid(){return (crypto.randomUUID?crypto.randomUUID():'id-'+Math.random().toString(36).slice(2))}
+function save(){ localStorage.setItem(storeKey, JSON.stringify(state)); if (typeof refreshSummaries==='function') refreshSummaries(); }  
 
 // render players + drag
 function renderPlayers(){
