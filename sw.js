@@ -1,1 +1,2 @@
-{"name": "Wisselplanner", "short_name": "Wisselplanner", "start_url": "./index.html", "display": "standalone", "background_color": "#0b1220", "theme_color": "#0b1220", "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}]}
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
