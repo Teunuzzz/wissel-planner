@@ -3,17 +3,23 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"/>
-<title>Wissel Planner O9</title>
+<title>Wissel Planner O9 – De Esch</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#1f4aa3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-/* ---------- Theming & base ---------- */
+/* ---------- Theming (ZVV De Esch: geel/blauw) ---------- */
 :root{
-  --bg:#0f172a; --panel:#111827; --border:#1f2937; --muted:#94a3b8; --accent:#2563eb;
-  --chip:#0b1220; --chipb:#334155;
+  --bg:#0b1020;            /* deep dark */
+  --panel:#0f162c;
+  --border:#1b2a4a;
+  --muted:#9fb3d8;
+  --accent:#1f4aa3;        /* team blauw */
+  --accent-2:#f5d02e;      /* team geel */
+  --chip:#0a1325;
+  --chipb:#203656;
   --radius:14px;
   --space:clamp(10px,2.5vw,16px);
   --fz-xs:clamp(11px, 2.2vw, 12px);
@@ -21,6 +27,8 @@
   --fz-md:clamp(14px, 3.2vw, 16px);
   --fz-lg:clamp(18px, 5vw, 22px);
   --fz-xl:clamp(24px, 7vw, 32px);
+  --fz-xxl:clamp(32px, 9vw, 64px);
+  --fz-xxxl:clamp(44px, 12vw, 96px);
 }
 *{box-sizing:border-box}
 html{height:100%; -webkit-text-size-adjust:100%;}
@@ -28,7 +36,7 @@ body{
   min-height:100%;
   margin:0;
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;
-  color:#e2e8f0; background:var(--bg);
+  color:#e6eefc; background:var(--bg);
   font-size:var(--fz-md);
   line-height:1.35;
 }
@@ -37,17 +45,18 @@ body{
 /* ---------- Layout wrappers ---------- */
 header{
   position:sticky; top:0; z-index:10;
-  background:var(--panel); border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg, rgba(31,74,163,.9), rgba(31,74,163,.6));
+  border-bottom:2px solid var(--accent-2);
   padding:calc(var(--space)*0.8) var(--space); display:flex; align-items:center; gap:8px;
 }
 h1{font-size:var(--fz-lg); margin:0}
 main{
   padding: var(--space);
   padding-bottom: calc(80px + env(safe-area-inset-bottom));
-  max-width: 840px; margin-inline:auto; /* nice on tablets/desktops */
+  max-width: 900px; margin-inline:auto;
 }
-section{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:var(--space)}
-section h2{margin:0; padding:10px 12px; border-bottom:1px solid var(--border); font-size:var(--fz-sm); color:#93c5fd}
+section{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:var(--space); box-shadow:0 0 0 1px rgba(245,208,46,.12) inset}
+section h2{margin:0; padding:10px 12px; border-bottom:1px solid var(--border); font-size:var(--fz-sm); color:var(--accent-2)}
 .content{padding:var(--space)}
 
 .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px}
@@ -66,11 +75,13 @@ input[type="checkbox"]{ transform:scale(1.2); }
 button{
   background:var(--accent); color:#fff; border:none; border-radius:12px; padding:12px 14px;
   font-size:var(--fz-md); min-height:44px;
+  box-shadow:0 0 0 1px rgba(245,208,46,.25) inset;
 }
-button.secondary{ background:#374151 }
+button.secondary{ background:#1b2a4a }
 button.ghost{ background:transparent; border:1px solid var(--chipb) }
+button.yellow{ background:var(--accent-2); color:#0b1020; }
 
-.pill{ padding:4px 10px; border-radius:999px; background:var(--chip); border:1px solid var(--chipb); color:#cbd5e1; font-size:var(--fz-xs) }
+.pill{ padding:4px 10px; border-radius:999px; background:var(--chip); border:1px solid var(--chipb); color:#e6eefc; font-size:var(--fz-xs) }
 .small{ font-size:var(--fz-sm); color:var(--muted) }
 
 .list{ display:flex; flex-direction:column; gap:6px }
@@ -105,36 +116,55 @@ button.ghost{ background:transparent; border:1px solid var(--chipb) }
   .tbl{ display:none }
   .cards{ display:grid; gap:8px }
   .card{ border:1px solid var(--border); background:var(--chip); border-radius:12px; padding:10px }
-  .card .title{ font-weight:600; margin-bottom:6px }
+  .card .title{ font-weight:600; margin-bottom:6px; color:var(--accent-2) }
   .card .line{ margin:2px 0 }
 }
 @media (min-width:421px){
   .cards{ display:none }
 }
 
-.hl{ outline:2px solid #60a5fa }
-.overlay{ position:fixed; inset:0; background:rgba(0,0,0,.92); color:#fff; display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:999; text-align:center; padding:24px }
+.hl{ outline:2px solid var(--accent-2) }
+.overlay{
+  position:fixed; inset:0; background:rgba(15,22,44,.96); color:#fff;
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:999; text-align:center; padding:24px;
+  border-top:6px solid var(--accent-2);
+}
 .overlay.show{ display:flex }
-.overlay h3{ font-size:var(--fz-lg); margin:0 }
+.overlay h3{ font-size:var(--fz-lg); margin:0; color:var(--accent-2) }
 
 /* Tabs with safe-area padding */
 .tabs{
   position:fixed; bottom:0; left:0; right:0; z-index:20;
-  background:var(--panel); border-top:1px solid var(--border); display:flex;
+  background:var(--panel); border-top:2px solid var(--accent-2); display:flex;
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tab{ flex:1; padding:10px 4px; text-align:center; color:#cbd5e1; text-decoration:none; font-size:var(--fz-sm) }
-.tab.active{ background:#0b1220; color:#fff }
+.tab.active{ background:#0a1325; color:#fff }
 
-.badge{ display:inline-block; margin-left:6px; padding:2px 8px; border:1px solid #22c55e; border-radius:999px; color:#22c55e; font-size:var(--fz-xs) }
+.badge{ display:inline-block; margin-left:6px; padding:2px 8px; border:1px solid var(--accent-2); border-radius:999px; color:var(--accent-2); font-size:var(--fz-xs) }
 
 .flash{ animation: blink 1s steps(2,start) 2 }
 @keyframes blink{ to{ opacity:0 } }
+
+/* ---------- BOARD (big screen) ---------- */
+.board-wrap{ display:grid; gap:16px }
+.board-top{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap }
+.board-title{ font-size:var(--fz-xxl); font-weight:700; color:#fff }
+.board-time{ font-size:var(--fz-xxxl); font-weight:800; letter-spacing:1px }
+.board-badges .pill{ background:#112044; border-color:#204073 }
+.board-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px }
+@media (max-width:740px){ .board-grid{ grid-template-columns:1fr } }
+.board-card{ background:var(--panel); border:2px solid var(--accent); border-radius:18px; padding:16px }
+.board-card h3{ margin:0 0 8px 0; font-size:var(--fz-lg); color:var(--accent-2) }
+.big-names{ display:flex; flex-wrap:wrap; gap:10px }
+.big-name{ font-size:clamp(22px, 4.4vw, 42px); padding:10px 14px; border-radius:999px; background:#0a1325; border:1px solid var(--chipb) }
+.banner{ background:var(--accent-2); color:#0b1020; font-weight:800; padding:8px 12px; border-radius:12px; text-align:center }
+.fs-btn{ background:var(--accent-2); color:#0b1020; }
 </style>
 </head>
 <body>
 <header>
-  <h1>⚽ Wissel Planner O9</h1>
+  <h1>⚽ De Esch – Wissel Planner O9</h1>
   <span class="pill" id="presenceSummary">0 aanwezig</span>
   <span class="pill" id="benchSummary">bench 0</span>
   <span class="badge" id="strictBadge" style="display:none;">Strikt ≤ 5m</span>
@@ -191,7 +221,7 @@ button.ghost{ background:transparent; border:1px solid var(--chipb) }
         <div id="playerList" class="list"></div>
         <div class="row">
           <button id="generateBtn" type="button">Voorstel genereren</button>
-          <span class="small">Ga hierna naar <strong>Live</strong> tab.</span>
+          <span class="small">Ga hierna naar <strong>Live</strong> of <strong>Wisselbord</strong>.</span>
         </div>
       </div>
     </section>
@@ -238,27 +268,36 @@ button.ghost{ background:transparent; border:1px solid var(--chipb) }
     </section>
   </div>
 
-  <!-- CHANGES PAGE -->
-  <div id="page-changes" class="page" style="display:none">
+  <!-- BOARD PAGE -->
+  <div id="page-board" class="page" style="display:none">
     <section>
-      <h2>Snelle wijzigingen</h2>
+      <h2>Wisselbord (groot scherm)</h2>
       <div class="content">
-        <div class="row">
-          <select id="stopPlayerSelect"></select>
-          <button id="stopPlayerBtn" class="secondary">⛑️ Speler stopt</button>
-        </div>
-        <div class="row">
-          <button id="recalcBtn">🔁 Herbereken vanaf nu</button>
-          <span id="strictNote" class="small" style="display:none;">Strikt actief (≤ 5m).</span>
-        </div>
-        <div class="row">
-          <div class="small">Huidig slot aanpassen</div>
-          <div><strong>Keeper:</strong> <select id="liveKeeperSelect"></select></div>
-          <div class="small">Tap naam om veld ↔ bank te wisselen</div>
-          <div><strong>Op veld:</strong> <div id="liveFieldEdit" class="lineup">—</div></div>
-          <div class="small">Bank:</div>
-          <div id="liveBenchEdit" class="lineup">—</div>
-          <button id="applyLiveBtn" class="ghost">✅ Toepassen</button>
+        <div class="board-wrap">
+          <div class="board-top">
+            <div class="board-title">De Esch – O9</div>
+            <div class="board-badges">
+              <span class="pill" id="boardQuarter">Kwart 1 / 4</span>
+              <span class="pill" id="boardInterval">Wissel: 5m</span>
+              <button id="fsBtn" class="fs-btn">⛶ Volledig scherm</button>
+            </div>
+          </div>
+          <div class="board-time" id="boardTime">00:00</div>
+          <div class="banner" id="boardBanner" style="display:none;">WISSEL NU: <span id="boardOut"></span></div>
+          <div class="board-grid">
+            <div class="board-card">
+              <h3>Actueel</h3>
+              <div><strong>Keeper:</strong> <span id="boardK">—</span></div>
+              <div class="big-names" id="boardField">—</div>
+              <div class="small">Bank: <span id="boardBench">—</span></div>
+            </div>
+            <div class="board-card">
+              <h3>Volgend slot</h3>
+              <div><strong>Keeper:</strong> <span id="boardKNext">—</span></div>
+              <div class="big-names" id="boardFieldNext">—</div>
+              <div class="small">Bank: <span id="boardBenchNext">—</span></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -269,6 +308,7 @@ button.ghost{ background:transparent; border:1px solid var(--chipb) }
 <nav class="tabs">
   <a href="#setup" class="tab" id="tab-setup">⚙️ Voorbereiding</a>
   <a href="#live" class="tab" id="tab-live">⏱️ Live</a>
+  <a href="#board" class="tab" id="tab-board">📺 Wisselbord</a>
   <a href="#changes" class="tab" id="tab-changes">🛠️ Wijzigingen</a>
 </nav>
 
@@ -295,20 +335,23 @@ function $(id){ return document.getElementById(id); }
 function pad2(n){ return String(n).padStart(2,'0'); }
 function fmt(sec){ const m=Math.floor(sec/60), s=Math.floor(sec%60); return pad2(m)+':'+pad2(s); }
 function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p);}catch(e){} }
+function requestFS(el){ const r=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen; if(r) r.call(el); }
 
 // --- state ---
-let state = JSON.parse(getStore('wisselplanner_state_mobile_strict_v2_2')||'null') || {
+let state = JSON.parse(getStore('wisselplanner_state_mobile_team_v2_3')||'null') || {
   players: DEFAULT_NAMES.map((n,i)=>({id:rid(), name:n, pos:'ALL', present:true, keeperCandidate:(i<3), quality:(DEFAULT_NAMES.length-i)})),
   quarters:4, minsPerQuarter:10, subInterval:5, formation:6, keeperCount:1, keeperPolicy:'prefer', strict:false
 };
-function save(){ setStore('wisselplanner_state_mobile_strict_v2_2', JSON.stringify(state)); refreshSummaries(); }
+function save(){ setStore('wisselplanner_state_mobile_team_v2_3', JSON.stringify(state)); refreshSummaries(); }
 
 // --- router ---
 function showPage(hash){
   const page = (hash||'#setup').replace('#','');
-  ['setup','live','changes'].forEach(p=>{
-    document.getElementById('page-'+p).style.display = (p===page)?'block':'none';
-    document.getElementById('tab-'+p).classList.toggle('active', p===page);
+  ['setup','live','changes','board'].forEach(p=>{
+    const el = document.getElementById('page-'+p);
+    if(el) el.style.display = (p===page)?'block':'none';
+    const tab = document.getElementById('tab-'+p);
+    if(tab) tab.classList.toggle('active', p===page);
   });
 }
 window.addEventListener('hashchange', ()=> showPage(location.hash));
@@ -317,10 +360,10 @@ showPage(location.hash);
 // --- setup UI ---
 ['quarters','minsPerQuarter','subInterval'].forEach(id=>{
   document.getElementById(id).value = state[id];
-  document.getElementById(id).addEventListener('change', e=>{ state[id]=parseInt(e.target.value,10)||1; save(); computeQuarterLen(); });
+  document.getElementById(id).addEventListener('change', e=>{ state[id]=parseInt(e.target.value,10)||1; save(); computeQuarterLen(); updateBoardFixed(); });
 });
 document.getElementById('formation').value = String(state.formation);
-document.getElementById('formation').addEventListener('change', e=>{ state.formation=parseInt(e.target.value,10); save(); });
+document.getElementById('formation').addEventListener('change', e=>{ state.formation=parseInt(e.target.value,10); save(); updateBoardFixed(); });
 document.getElementById('keeperCount').value = String(state.keeperCount);
 document.getElementById('keeperCount').addEventListener('change', e=>{ state.keeperCount=parseInt(e.target.value,10); save(); });
 document.getElementById('keeperPolicy').value = state.keeperPolicy;
@@ -330,7 +373,7 @@ document.getElementById('strictMode').checked = !!state.strict;
 function applyStrictUI(){
   const strict=!!state.strict;
   document.getElementById('strictBadge').style.display = strict ? 'inline-block' : 'none';
-  document.getElementById('strictNote').style.display = strict ? 'inline' : 'none';
+  document.getElementById('strictNote') && (document.getElementById('strictNote').style.display = strict ? 'inline' : 'none');
   const si = document.getElementById('subInterval');
   if(strict){
     state.subInterval = 5;
@@ -339,7 +382,7 @@ function applyStrictUI(){
   }else{
     si.removeAttribute('disabled');
   }
-  save();
+  save(); updateBoardFixed();
 }
 document.getElementById('strictMode').addEventListener('change', e=>{ state.strict = e.target.checked; applyStrictUI(); });
 
@@ -395,7 +438,7 @@ document.getElementById('addBtn').addEventListener('click', ()=>{
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   if(!confirm('Reset naar vaste 8 (Wouter t/m Diede)?')) return;
-  state.players = DEFAULT_NAMES.map((n,i)=>({id:rid(), name:n, pos:'ALL', present:true, keeperCandidate:(i<3), quality:(DEFAULT_NAMES.length-i)}));
+  state.players = DEFAULT_NAMES.map((n,i)=>({id:rid(), name=n, pos:'ALL', present:true, keeperCandidate:(i<3), quality:(DEFAULT_NAMES.length-i)}));
   save(); renderPlayers();
 });
 
@@ -586,7 +629,27 @@ function renderSchedule(schedule){
     `;
     cards.appendChild(c);
   }
+  renderBoard(); // keep board view in sync
 }
+
+// --- Board rendering ---
+function updateBoardFixed(){
+  document.getElementById('boardInterval').textContent = 'Wissel: '+state.subInterval+'m';
+}
+function renderBoard(){
+  if(!lastSchedule.length) return;
+  const seg = lastSchedule[curSegIndex] || lastSchedule[lastSchedule.length-1];
+  const next = lastSchedule[Math.min(curSegIndex+1, lastSchedule.length-1)];
+  document.getElementById('boardQuarter').textContent = `Kwart ${Math.floor(curSegIndex/slotsPerQuarterVal())+1} / ${state.quarters}`;
+  document.getElementById('boardTime').textContent = document.getElementById('elapsed').textContent;
+  document.getElementById('boardK').textContent = seg?.keeper?.name || '—';
+  document.getElementById('boardField').innerHTML = seg?.field?.map(p=>`<span class="big-name">${p.name}</span>`).join(' ') || '—';
+  document.getElementById('boardBench').textContent = seg?.bench?.map(p=>p.name).join(', ') || '—';
+  document.getElementById('boardKNext').textContent = next?.keeper?.name || '—';
+  document.getElementById('boardFieldNext').innerHTML = next?.field?.map(p=>`<span class="big-name">${p.name}</span>`).join(' ') || '—';
+  document.getElementById('boardBenchNext').textContent = next?.bench?.map(p=>p.name).join(', ') || '—';
+}
+document.getElementById('fsBtn').addEventListener('click', ()=> requestFS(document.documentElement));
 
 let timer=null, startEpoch=0, paused=true, elapsedSec=0, curSegIndex=0;
 function slotsPerQuarterVal(){ return Math.ceil(state.minsPerQuarter / state.subInterval); }
@@ -615,6 +678,9 @@ function applyLiveSegment(){
   document.querySelectorAll('#liveBenchEdit .chip').forEach(b=> b.addEventListener('click', ()=> toggleLive(b.dataset.id,true)));
   const stopSel = document.getElementById('stopPlayerSelect');
   stopSel.innerHTML = state.players.filter(p=>p.present).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+
+  // keep board synced
+  renderBoard();
 }
 function toggleLive(pid, moveToField){
   const seg = lastSchedule[curSegIndex];
@@ -632,12 +698,16 @@ function toggleLive(pid, moveToField){
   applyLiveSegment();
 }
 
-// overlay
+// overlay + board banner
 function showOverlay(outgoing){
   const overlay = document.getElementById('swapOverlay');
   const list = document.getElementById('outNames');
   list.innerHTML = outgoing.map(n=>`<span class="chip">${n}</span>`).join(' ');
   overlay.classList.add('show');
+  // Board banner
+  const bb = document.getElementById('boardBanner');
+  document.getElementById('boardOut').textContent = outgoing.join(', ');
+  bb.style.display = outgoing.length ? 'block' : 'none';
 }
 document.getElementById('hideOverlay').addEventListener('click', ()=> document.getElementById('swapOverlay').classList.remove('show'));
 
@@ -667,6 +737,9 @@ document.getElementById('startBtn').addEventListener('click', ()=>{
       document.querySelector('.timerBox').classList.add('flash'); setTimeout(()=>document.querySelector('.timerBox').classList.remove('flash'),1000);
     }
     updateTimeUI();
+    // board time sync
+    document.getElementById('boardTime').textContent = document.getElementById('elapsed').textContent;
+    document.getElementById('boardQuarter').textContent = `Kwart ${Math.floor(curSegIndex/slotsPerQuarterVal())+1} / ${state.quarters}`;
   },250);
 });
 document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=true; if(timer){clearInterval(timer); timer=null;} });
@@ -725,6 +798,7 @@ document.getElementById('generateBtn').addEventListener('click', ()=>{
   curSegIndex=0; elapsedSec=0; paused=true; if(timer){clearInterval(timer); timer=null;}
   const sched = generateSchedule(0,null);
   renderSchedule(sched); computeQuarterLen(); updateTimeUI(); applyLiveSegment(); highlightRow(); save();
+  updateBoardFixed(); renderBoard();
 });
 
 function init(){
@@ -732,6 +806,7 @@ function init(){
   applyStrictUI();
   refreshSummaries();
   computeQuarterLen();
+  updateBoardFixed();
 }
 init();
 </script>
