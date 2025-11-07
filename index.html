@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Wissel Planner O9</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{ --bg:#0f172a; --panel:#111827; --border:#1f2937; --muted:#94a3b8; --accent:#2563eb; --chip:#0b1220; --chipb:#334155; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;color:#e2e8f0;background:var(--bg)}
+header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px}
+h1{font-size:16px;margin:0}
+main{padding:14px; padding-bottom:80px; /* space for tabs */}
+section{background:var(--panel);border:1px solid var(--border);border-radius:14px;margin-bottom:12px}
+section h2{margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px;color:#93c5fd}
+.content{padding:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+input[type="text"], input[type="number"], select{background:var(--chip);color:#e5e7eb;border:1px solid var(--chipb);border-radius:10px;padding:10px 12px}
+input[type="checkbox"]{transform:scale(1.2)}
+button{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:12px 14px;font-size:16px}
+button.secondary{background:#374151}
+button.ghost{background:transparent;border:1px solid var(--chipb)}
+.pill{padding:4px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--chipb);color:#cbd5e1;font-size:12px}
+.small{font-size:12px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:6px}
+.player{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px;border:1px dashed var(--chipb);border-radius:12px;background:var(--chip)}
+.player .line1{display:flex;gap:8px;align-items:center}
+.player .line1 input{flex:1;min-width:140px}
+.player .line2{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.chip{background:var(--chip);border:1px solid var(--chipb);padding:6px 10px;border-radius:999px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.timeBig{font-variant-numeric:tabular-nums;font-size:40px}
+.timeSmall{font-variant-numeric:tabular-nums;opacity:.8}
+.timerBox{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--chipb);border-radius:12px;background:var(--chip)}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.lineup{display:flex;gap:6px;flex-wrap:wrap}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th,.tbl td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
+.tbl tr:nth-child(even) td{background:var(--chip)}
+.hl{outline:2px solid #60a5fa}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:999;text-align:center;padding:24px}
+.overlay.show{display:flex}
+.overlay h3{font-size:28px;margin:0}
+.tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;background:var(--panel);border-top:1px solid var(--border);display:flex}
+.tab{flex:1;padding:10px 4px;text-align:center;color:#cbd5e1;text-decoration:none}
+.tab.active{background:#0b1220;color:#fff}
+.badge{display:inline-block;margin-left:6px;padding:2px 8px;border:1px solid #22c55e;border-radius:999px;color:#22c55e;font-size:11px}
+.flash{animation: blink 1s steps(2,start) 2}
+@keyframes blink{to{opacity:0}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Wissel Planner O9</h1>
+  <span class="pill" id="presenceSummary">0 aanwezig</span>
+  <span class="pill" id="benchSummary">bench 0</span>
+  <span class="badge" id="strictBadge" style="display:none;">Strikt ≤ 5m</span>
+</header>
+
+<main>
+  <!-- SETUP PAGE -->
+  <div id="page-setup" class="page">
+    <section>
+      <h2>Voorbereiding</h2>
+      <div class="content">
+        <div class="row grid2">
+          <label> Kwartieren<br><input id="quarters" type="number" min="1" value="4"></label>
+          <label> Min/kwart<br><input id="minsPerQuarter" type="number" min="1" value="10"></label>
+          <label> Wissel (min)<br><input id="subInterval" type="number" min="1" value="5"></label>
+          <label> Formatie (incl. K)<br>
+            <select id="formation">
+              <option value="6">6 (5+K)</option>
+              <option value="7">7 (6+K)</option>
+              <option value="5">5 (4+K)</option>
+            </select>
+          </label>
+          <label> Aantal keepers<br>
+            <select id="keeperCount">
+              <option value="1">1 (wedstrijd)</option>
+              <option value="2">2 (helft)</option>
+              <option value="4">4 (kwart)</option>
+            </select>
+          </label>
+          <label> Keeper-selectie<br>
+            <select id="keeperPolicy">
+              <option value="prefer">Kandidaten eerst</option>
+              <option value="only">Alleen kandidaten</option>
+              <option value="any">Iedereen mag</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="row">
+          <label class="small"><input type="checkbox" id="strictMode"/> ⚖️ Strikte eerlijkheid (≤ 1 slot = 5 min)</label>
+        </div>
+
+        <div class="row">
+          <input id="newName" type="text" placeholder="Naam speler">
+          <select id="newPos">
+            <option value="ALL">Allround</option>
+            <option value="DEF">Verd</option>
+            <option value="MID">Mid</option>
+            <option value="ATT">Aanv</option>
+          </select>
+          <button id="addBtn" type="button">Toevoegen</button>
+          <button class="ghost" id="resetBtn" type="button">Reset naar vaste 8</button>
+        </div>
+        <div id="playerList" class="list"></div>
+        <div class="row">
+          <button id="generateBtn" type="button">Voorstel genereren</button>
+          <span class="small">Ga hierna naar <strong>Live</strong> tab.</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- LIVE PAGE -->
+  <div id="page-live" class="page" style="display:none">
+    <section>
+      <h2>Tijdens de wedstrijd</h2>
+      <div class="content">
+        <div class="timerBox">
+          <div>
+            <div class="small" id="quarterLabel">Kwart 1 / 4</div>
+            <div class="timeBig"><span id="elapsed">00:00</span> <span class="timeSmall">/ <span id="quarterLen">10:00</span></span></div>
+            <div class="small">Volgende wissel in: <span id="toNext">--:--</span></div>
+          </div>
+          <div class="controls">
+            <button id="startBtn">▶️</button>
+            <button id="pauseBtn" class="secondary">⏸️</button>
+            <button id="resetBtnQ" class="ghost">🔄</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="small">Actuele opstelling</div>
+          <div><strong>Keeper:</strong> <span id="liveKeeper">—</span></div>
+          <div><strong>Veld:</strong> <div id="liveField" class="lineup">—</div></div>
+          <div class="small">Bank: <span id="liveBench">—</span></div>
+        </div>
+
+        <section style="margin-top:12px">
+          <h2>Schema</h2>
+          <div class="content">
+            <table class="tbl" id="scheduleTable">
+              <thead><tr><th>Slot</th><th>Tijd</th><th>Keeper</th><th>Veld</th><th>Bank</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <!-- CHANGES PAGE -->
+  <div id="page-changes" class="page" style="display:none">
+    <section>
+      <h2>Snelle wijzigingen</h2>
+      <div class="content">
+        <div class="row">
+          <select id="stopPlayerSelect"></select>
+          <button id="stopPlayerBtn" class="secondary">⛑️ Speler stopt</button>
+        </div>
+        <div class="row">
+          <button id="recalcBtn">🔁 Herbereken vanaf nu</button>
+          <span id="strictNote" class="small" style="display:none;">Strikt actief (≤ 5m).</span>
+        </div>
+        <div class="row">
+          <div class="small">Huidig slot aanpassen</div>
+          <div><strong>Keeper:</strong> <select id="liveKeeperSelect"></select></div>
+          <div class="small">Tap naam om veld ↔ bank te wisselen</div>
+          <div><strong>Op veld:</strong> <div id="liveFieldEdit" class="lineup">—</div></div>
+          <div class="small">Bank:</div>
+          <div id="liveBenchEdit" class="lineup">—</div>
+          <button id="applyLiveBtn" class="ghost">✅ Toepassen</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- Bottom tabs -->
+<nav class="tabs">
+  <a href="#setup" class="tab" id="tab-setup">⚙️ Voorbereiding</a>
+  <a href="#live" class="tab" id="tab-live">⏱️ Live</a>
+  <a href="#changes" class="tab" id="tab-changes">🛠️ Wijzigingen</a>
+</nav>
+
+<!-- Overlay -->
+<div class="overlay" id="swapOverlay">
+  <h3>WISSEL NU</h3>
+  <div class="small">Uitgaande spelers:</div>
+  <div id="outNames" class="lineup"></div>
+  <button id="hideOverlay" class="secondary">OK</button>
+</div>
+
+<script>
+if('serviceWorker' in navigator){ window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(console.error)); }
+
+// --- util/store ---
+let canStore=true; try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ canStore=false; }
+function setStore(k,v){ if(canStore){ localStorage.setItem(k,v);} else { window.__mem=window.__mem||{}; __mem[k]=v; } }
+function getStore(k){ return canStore?localStorage.getItem(k):((window.__mem||{})[k]||null); }
+
+const POS_LABEL={ALL:'All',DEF:'Verd',MID:'Mid',ATT:'Aanv'};
+const DEFAULT_NAMES=["Wouter","Sydney","Twan","Milan","Ryan","Dani","Finn","Diede"];
+function rid(){ try{ if(typeof crypto!=='undefined'&&crypto&&typeof crypto.randomUUID==='function') return crypto.randomUUID(); }catch(e){} return 'id-'+Math.random().toString(36).slice(2); }
+function $(id){ return document.getElementById(id); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmt(sec){ const m=Math.floor(sec/60), s=Math.floor(sec%60); return pad2(m)+':'+pad2(s); }
+function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p);}catch(e){} }
+
+// --- state ---
+let state = JSON.parse(getStore('wisselplanner_state_mobile_strict')||'null') || {
+  players: DEFAULT_NAMES.map((n,i)=>({id:rid(),name=n,pos:'ALL',present:true,keeperCandidate:(i<3),quality:(DEFAULT_NAMES.length-i)})),
+  quarters:4, minsPerQuarter:10, subInterval:5, formation:6, keeperCount:1, keeperPolicy:'prefer', strict:false
+};
+function save(){ setStore('wisselplanner_state_mobile_strict', JSON.stringify(state)); refreshSummaries(); }
+
+// --- router ---
+function showPage(hash){
+  const page = (hash||'#setup').replace('#','');
+  ['setup','live','changes'].forEach(p=>{
+    document.getElementById('page-'+p).style.display = (p===page)?'block':'none';
+    document.getElementById('tab-'+p).classList.toggle('active', p===page);
+  });
+}
+window.addEventListener('hashchange', ()=> showPage(location.hash));
+showPage(location.hash);
+
+// --- setup UI ---
+['quarters','minsPerQuarter','subInterval'].forEach(id=>{
+  document.getElementById(id).value = state[id];
+  document.getElementById(id).addEventListener('change', e=>{ state[id]=parseInt(e.target.value,10)||1; save(); computeQuarterLen(); });
+});
+document.getElementById('formation').value = String(state.formation);
+document.getElementById('formation').addEventListener('change', e=>{ state.formation=parseInt(e.target.value,10); save(); });
+document.getElementById('keeperCount').value = String(state.keeperCount);
+document.getElementById('keeperCount').addEventListener('change', e=>{ state.keeperCount=parseInt(e.target.value,10); save(); });
+document.getElementById('keeperPolicy').value = state.keeperPolicy;
+document.getElementById('keeperPolicy').addEventListener('change', e=>{ state.keeperPolicy=e.target.value; save(); });
+
+document.getElementById('strictMode').checked = !!state.strict;
+function applyStrictUI(){
+  const strict=!!state.strict;
+  document.getElementById('strictBadge').style.display = strict ? 'inline-block' : 'none';
+  document.getElementById('strictNote').style.display = strict ? 'inline' : 'none';
+  const si = document.getElementById('subInterval');
+  if(strict){
+    state.subInterval = 5;
+    si.value = 5;
+    si.setAttribute('disabled','disabled');
+  }else{
+    si.removeAttribute('disabled');
+  }
+  save();
+}
+document.getElementById('strictMode').addEventListener('change', e=>{ state.strict = e.target.checked; applyStrictUI(); });
+
+function refreshSummaries(){
+  const present = state.players.filter(p=>p.present);
+  document.getElementById('presenceSummary').textContent = present.length+' aanwezig';
+  document.getElementById('benchSummary').textContent = 'bench '+Math.max(0,present.length - state.formation);
+}
+function renderPlayers(){
+  const wrap = document.getElementById('playerList'); wrap.innerHTML='';
+  state.players.forEach((p,idx)=>{
+    const el = document.createElement('div'); el.className='player';
+    el.innerHTML = `
+      <div>
+        <div class="line1">
+          <input class="name" value="${p.name}"/>
+          <select class="pos">
+            <option value="ALL"${p.pos==='ALL'?' selected':''}>All</option>
+            <option value="DEF"${p.pos==='DEF'?' selected':''}>Verd</option>
+            <option value="MID"${p.pos==='MID'?' selected':''}>Mid</option>
+            <option value="ATT"${p.pos==='ATT'?' selected':''}>Aanv</option>
+          </select>
+          <label class="small"><input class="present" type="checkbox"${p.present?' checked':''}/> Aanwezig</label>
+          <label class="small"><input class="keeper" type="checkbox"${p.keeperCandidate?' checked':''}/> K</label>
+        </div>
+        <div class="line2">
+          <span class="small">Rang: ${state.players.length-idx} • ${POS_LABEL[p.pos]}</span>
+          <span>
+            <button class="ghost up">↑</button>
+            <button class="ghost down">↓</button>
+            <button class="ghost del">✖</button>
+          </span>
+        </div>
+      </div>`;
+    wrap.appendChild(el);
+    el.querySelector('.name').addEventListener('input', e=>{ p.name=e.target.value; save(); });
+    el.querySelector('.pos').addEventListener('change', e=>{ p.pos=e.target.value; save(); });
+    el.querySelector('.present').addEventListener('change', e=>{ p.present=e.target.checked; save(); });
+    el.querySelector('.keeper').addEventListener('change', e=>{ p.keeperCandidate=e.target.checked; save(); });
+    el.querySelector('.up').addEventListener('click', ()=> move(idx,-1));
+    el.querySelector('.down').addEventListener('click', ()=> move(idx,1));
+    el.querySelector('.del').addEventListener('click', ()=>{ state.players.splice(idx,1); renum(); save(); renderPlayers(); });
+  });
+}
+function renum(){ state.players.forEach((p,i)=> p.quality = (state.players.length - i)); }
+function move(i, d){ const j=i+d; if(j<0||j>=state.players.length) return; const [m]=state.players.splice(i,1); state.players.splice(j,0,m); renum(); save(); renderPlayers(); }
+
+document.getElementById('addBtn').addEventListener('click', ()=>{
+  let name=document.getElementById('newName').value.trim(); if(!name) name='Speler '+(state.players.length+1);
+  const pos=document.getElementById('newPos').value;
+  state.players.push({id:rid(), name, pos, present:true, keeperCandidate:false, quality:1});
+  renum(); document.getElementById('newName').value=''; save(); renderPlayers();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('Reset naar vaste 8 (Wouter t/m Diede)?')) return;
+  state.players = DEFAULT_NAMES.map((n,i)=>({id:rid(), name:n, pos:'ALL', present:true, keeperCandidate:(i<3), quality:(DEFAULT_NAMES.length-i)}));
+  save(); renderPlayers();
+});
+
+// --- scheduler logic ---
+function buildSegments(){
+  const totalMinutes = state.quarters*state.minsPerQuarter;
+  const spq = Math.ceil(state.minsPerQuarter / state.subInterval);
+  const segs=[]; let t=0;
+  for(let q=0;q<state.quarters;q++){
+    for(let s=0;s<spq;s++){
+      const start=t, end=Math.min(totalMinutes, t+state.subInterval);
+      segs.push({q,s,start,end,duration:end-start});
+      t=end;
+    }
+  }
+  return segs;
+}
+function slotsPerQuarter(){ return Math.ceil(state.minsPerQuarter / state.subInterval); }
+function segIndex(seg){ return seg.q*slotsPerQuarter()+seg.s; }
+function minutesFor(pid, sched){ let m=0; for(const sl of sched){ if(sl.keeper?.id===pid) m+=sl.duration; if(sl.field.find(p=>p.id===pid)) m+=sl.duration; } return m; }
+function keeperKey(seg){ if(state.keeperCount===1) return 0; if(state.keeperCount===2) return (seg.q < state.quarters/2 ? 0:1); return seg.q; }
+function keeperPool(players){ if(state.keeperPolicy==='any') return players; if(state.keeperPolicy==='only') return players.filter(p=>p.keeperCandidate); const k=players.filter(p=>p.keeperCandidate); return k.length?k:players; }
+
+function pickKeeper(players, minutesMap, keeperCountMap){
+  const pool=keeperPool(players);
+  return [...pool].sort((a,b)=>{
+    const kd=(keeperCountMap.get(a.id)||0)-(keeperCountMap.get(b.id)||0); if(kd) return kd;
+    const md=(minutesMap.get(a.id)||0)-(minutesMap.get(b.id)||0); if(md) return md;
+    return a.quality-b.quality;
+  })[0];
+}
+function pickField(needed, avail, minutesMap, targetAvg){
+  const sorted=[...avail].sort((a,b)=>{
+    const md=(minutesMap.get(a.id)||0)-(minutesMap.get(b.id)||0); if(md) return md;
+    const ad=Math.abs(a.quality-targetAvg)-Math.abs(b.quality-targetAvg); if(ad) return ad;
+    return a.name.localeCompare(b.name);
+  });
+  const chosen=[]; let low=0, high=sorted.length-1;
+  while(chosen.length<needed && low<=high){
+    const currentAvg = chosen.length ? (chosen.reduce((s,p)=>s+p.quality,0)/chosen.length) : targetAvg;
+    if(currentAvg < targetAvg){ chosen.push(sorted[high--]); } else { chosen.push(sorted[low++]); }
+  }
+  return chosen;
+}
+function repairPositions(field, bench, keeper){
+  const exist={DEF:false,MID:false,ATT:false};
+  state.players.filter(p=>p.present && p.id!==keeper.id).forEach(p=>{ if(p.pos!=='ALL') exist[p.pos]=true; });
+  const ensure=['DEF','MID','ATT'];
+  for(const pos of ensure){
+    if(!exist[pos]) continue;
+    const has = field.some(p=>p.pos===pos || p.pos==='ALL');
+    if(!has){
+      const candidateIn = bench.find(p=>p.pos===pos) || bench.find(p=>p.pos==='ALL');
+      if(!candidateIn) continue;
+      const posCountsField={DEF:0,MID:0,ATT:0,ALL:0};
+      field.forEach(p=> posCountsField[p.pos]=(posCountsField[p.pos]||0)+1 );
+      let idxOut = field.findIndex(p=> p.pos!=='ALL' && posCountsField[p.pos]>1 );
+      if(idxOut===-1) idxOut = field.findIndex(p=> p.pos==='ALL');
+      if(idxOut===-1) idxOut = field.length-1;
+      const out = field[idxOut];
+      field[idxOut]=candidateIn;
+      const bi = bench.findIndex(p=>p.id===candidateIn.id);
+      bench[bi]=out;
+    }
+  }
+}
+
+// strict fairness optimizer: ensure max-min <= 5
+function optimizeStrict(schedule){
+  const slotDur = 5; // fixed per requirement
+  const present = state.players.filter(p=>p.present);
+  const m = new Map(present.map(p=>[p.id,0]));
+  schedule.forEach(sl=>{
+    if(sl.keeper) m.set(sl.keeper.id, (m.get(sl.keeper.id)||0)+sl.duration);
+    sl.field.forEach(p=> m.set(p.id, (m.get(p.id)||0)+sl.duration));
+  });
+  function getExtrema(){
+    let maxId=null, minId=null, maxV=-1e9, minV=1e9;
+    for(const p of present){
+      const v = m.get(p.id)||0;
+      if(v>maxV){ maxV=v; maxId=p.id; }
+      if(v<minV){ minV=v; minId=p.id; }
+    }
+    return {maxId, minId, maxV, minV};
+  }
+  let guard=0;
+  while(guard++<200){
+    const {maxId, minId, maxV, minV} = getExtrema();
+    if(maxV - minV <= slotDur) break;
+    let swapped=false;
+    for(const sl of schedule){
+      if(sl.duration < slotDur) continue;
+      const maxOnField = sl.field.find(p=>p.id===maxId);
+      const minOnBench = sl.bench.find(p=>p.id===minId);
+      const isKeeper = sl.keeper && sl.keeper.id===maxId;
+      if(maxOnField && minOnBench && !isKeeper){
+        // swap and repair
+        sl.field = sl.field.filter(p=>p.id!==maxId);
+        sl.bench = sl.bench.filter(p=>p.id!==minId);
+        const maxP = present.find(p=>p.id===maxId);
+        const minP = present.find(p=>p.id===minId);
+        sl.field.push(minP);
+        sl.bench.push(maxP);
+        repairPositions(sl.field, sl.bench, sl.keeper);
+        m.set(maxId, (m.get(maxId)||0) - sl.duration);
+        m.set(minId, (m.get(minId)||0) + sl.duration);
+        swapped=true; break;
+      }
+    }
+    if(!swapped) break;
+  }
+  return schedule;
+}
+
+let lastSchedule = [];
+
+function generateSchedule(fromIndex=0, minutesSeed=null){
+  const segments = buildSegments();
+  const present = state.players.filter(p=>p.present);
+  if(present.length < state.formation){ alert(`Te weinig spelers aanwezig (${present.length}) voor formatie ${state.formation}.`); return []; }
+  const minutesMap = new Map(present.map(p=>[p.id,0]));
+  if(minutesSeed){ for(const [id,val] of minutesSeed.entries()) if(minutesMap.has(id)) minutesMap.set(id, val); }
+  const keeperCountMap = new Map(present.map(p=>[p.id,0]));
+  const keeperForKey = new Map();
+  for(let i=0;i<segments.length;i++){
+    if(i<fromIndex) continue;
+    const seg=segments[i];
+    const key = (state.keeperCount===1)?0:(state.keeperCount===2 ? (seg.q < state.quarters/2 ? 0:1) : seg.q);
+    if(!keeperForKey.has(key)){
+      const k = pickKeeper(present, minutesMap, keeperCountMap);
+      keeperForKey.set(key, k);
+      keeperCountMap.set(k.id, (keeperCountMap.get(k.id)||0)+1);
+    }
+  }
+  const sched=[];
+  const targetAvg = present.reduce((s,p)=>s+p.quality,0)/present.length;
+  for(let i=0;i<segments.length;i++){
+    const seg=segments[i];
+    let keeper, field, bench;
+    if(i<fromIndex && lastSchedule[i]){
+      keeper=lastSchedule[i].keeper;
+      field=lastSchedule[i].field;
+      bench=lastSchedule[i].bench;
+    }else{
+      const key=(state.keeperCount===1)?0:(state.keeperCount===2 ? (seg.q < state.quarters/2 ? 0:1) : seg.q);
+      keeper = keeperForKey.get(key);
+      const fieldPool = present.filter(p=>p.id!==keeper.id);
+      field = pickField(state.formation-1, fieldPool, minutesMap, targetAvg);
+      const onIds = new Set([keeper.id, ...field.map(p=>p.id)]);
+      bench = present.filter(p=>!onIds.has(p.id));
+      repairPositions(field, bench, keeper);
+      minutesMap.set(keeper.id, (minutesMap.get(keeper.id)||0)+seg.duration);
+      field.forEach(p=> minutesMap.set(p.id, (minutesMap.get(p.id)||0)+seg.duration));
+    }
+    sched.push({ ...seg, keeper, field, bench });
+  }
+  if(state.strict){ optimizeStrict(sched); }
+  lastSchedule = sched;
+  return sched;
+}
+
+// --- live render ---
+function renderSchedule(schedule){
+  const tbody = document.querySelector("#scheduleTable tbody");
+  tbody.innerHTML="";
+  if(!schedule.length){ tbody.innerHTML = `<tr><td colspan="5" class="small">Nog geen schema.</td></tr>`; return; }
+  for(const seg of schedule){
+    const tr = document.createElement('tr');
+    tr.dataset.index = segIndex(seg);
+    tr.innerHTML = `
+      <td>Q${seg.q+1} • ${seg.s+1}</td>
+      <td>${pad2(seg.start)}–${pad2(seg.end)}m</td>
+      <td>${seg.keeper?seg.keeper.name:''}</td>
+      <td>${seg.field.map(p=>`<span class="chip">${p.name} <span class="small">[${POS_LABEL[p.pos]}]</span></span>`).join(' ')}</td>
+      <td class="small">${seg.bench.map(p=>`${p.name}${p.pos?` [${POS_LABEL[p.pos]}]`:''}`).join(', ')}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+let timer=null, startEpoch=0, paused=true, elapsedSec=0, curSegIndex=0;
+function slotsPerQuarterVal(){ return Math.ceil(state.minsPerQuarter / state.subInterval); }
+function currentQuarter(){ return Math.floor(curSegIndex / slotsPerQuarterVal()); }
+function computeQuarterLen(){ document.getElementById('quarterLen').textContent = fmt(state.minsPerQuarter*60); }
+function highlightRow(){
+  const rows = document.querySelectorAll('#scheduleTable tbody tr'); rows.forEach(r=>r.classList.remove('hl'));
+  const row = document.querySelector(`#scheduleTable tbody tr[data-index="${curSegIndex}"]`);
+  if(row){ row.classList.add('hl'); row.scrollIntoView({behavior:"smooth", block:"center"}); }
+}
+function applyLiveSegment(){
+  if(!lastSchedule.length) return;
+  const seg = lastSchedule[curSegIndex] || lastSchedule[lastSchedule.length-1];
+  document.getElementById('liveKeeper').textContent = seg?.keeper?.name || '—';
+  document.getElementById('liveField').innerHTML = seg?.field?.map(p=>`<span class="chip">${p.name}</span>`).join(' ') || '—';
+  document.getElementById('liveBench').textContent = seg?.bench?.map(p=>p.name).join(', ') || '—';
+  // changes page editors
+  const keeperSel = document.getElementById('liveKeeperSelect');
+  keeperSel.innerHTML = state.players.filter(p=>p.present).map(p=>`<option value="${p.id}"${seg.keeper && p.id===seg.keeper.id?' selected':''}>${p.name}</option>`).join('');
+  const mkBtn = (p,on)=>`<button data-id="${p.id}" class="chip" style="cursor:pointer">${p.name} ${on?'⤴':'⤵'}</button>`;
+  document.getElementById('liveFieldEdit').innerHTML = seg.field.map(p=>mkBtn(p,true)).join(' ');
+  document.getElementById('liveBenchEdit').innerHTML = seg.bench.map(p=>mkBtn(p,false)).join(' ');
+  document.querySelectorAll('#liveFieldEdit .chip').forEach(b=> b.addEventListener('click', ()=> toggleLive(b.dataset.id,false)));
+  document.querySelectorAll('#liveBenchEdit .chip').forEach(b=> b.addEventListener('click', ()=> toggleLive(b.dataset.id,true)));
+  // stop list
+  const stopSel = document.getElementById('stopPlayerSelect');
+  stopSel.innerHTML = state.players.filter(p=>p.present).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+function toggleLive(pid, moveToField){
+  const seg = lastSchedule[curSegIndex];
+  const player = state.players.find(p=>p.id===pid);
+  if(!player) return;
+  if(moveToField){
+    if(seg.field.length >= state.formation-1){ alert('Veld is vol'); return; }
+    seg.bench = seg.bench.filter(p=>p.id!==pid);
+    seg.field.push(player);
+  }else{
+    seg.field = seg.field.filter(p=>p.id!==pid);
+    seg.bench.push(player);
+  }
+  repairPositions(seg.field, seg.bench, seg.keeper);
+  applyLiveSegment();
+}
+
+// overlay
+function showOverlay(outgoing){
+  const overlay = document.getElementById('swapOverlay');
+  const list = document.getElementById('outNames');
+  list.innerHTML = outgoing.map(n=>`<span class="chip">${n}</span>`).join(' ');
+  overlay.classList.add('show');
+}
+document.getElementById('hideOverlay').addEventListener('click', ()=> document.getElementById('swapOverlay').classList.remove('show'));
+
+// timer
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  if(!lastSchedule.length){ alert('Genereer eerst een schema.'); return; }
+  if(!paused) return;
+  paused=false; startEpoch=performance.now()-elapsedSec*1000;
+  timer=setInterval(()=>{
+    const now=performance.now(); const prev=elapsedSec; elapsedSec=Math.max(0,(now-startEpoch)/1000);
+    const sub=state.subInterval*60;
+    const prevSlot=Math.floor(prev/sub);
+    const curSlot=Math.floor(elapsedSec/sub);
+    if(curSlot!==prevSlot && Math.floor(elapsedSec)!==0){
+      const prevSeg=lastSchedule[curSegIndex];
+      const spq=slotsPerQuarterVal();
+      const q=currentQuarter();
+      curSegIndex=Math.min(q*spq+curSlot, lastSchedule.length-1);
+      const curSeg=lastSchedule[curSegIndex];
+      const out=[];
+      const curSet=new Set([curSeg.keeper?.id, ...curSeg.field.map(p=>p.id)]);
+      if(prevSeg.keeper && !curSet.has(prevSeg.keeper.id)) out.push(prevSeg.keeper.name+' (K)');
+      prevSeg.field.forEach(p=>{ if(!curSet.has(p.id)) out.push(p.name); });
+      if(out.length) showOverlay(out);
+      vibrate([200,100,200]);
+      applyLiveSegment(); highlightRow();
+      document.querySelector('.timerBox').classList.add('flash'); setTimeout(()=>document.querySelector('.timerBox').classList.remove('flash'),1000);
+    }
+    updateTimeUI();
+  },250);
+});
+document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=true; if(timer){clearInterval(timer); timer=null;} });
+document.getElementById('resetBtnQ').addEventListener('click', ()=>{
+  if(timer){clearInterval(timer); timer=null;} paused=true; elapsedSec=0;
+  const spq=slotsPerQuarterVal(); const q=currentQuarter();
+  curSegIndex=q*spq; updateTimeUI(); applyLiveSegment(); highlightRow();
+});
+function updateTimeUI(){
+  document.getElementById('elapsed').textContent = fmt(elapsedSec);
+  const sub=state.subInterval*60;
+  const nextB=Math.ceil(elapsedSec/sub)*sub;
+  document.getElementById('toNext').textContent = fmt(Math.max(0,nextB-elapsedSec));
+  const q=currentQuarter();
+  document.getElementById('quarterLabel').textContent = `Kwart ${q+1} / ${state.quarters}`;
+}
+
+// changes actions
+document.getElementById('applyLiveBtn').addEventListener('click', ()=>{
+  const seg=lastSchedule[curSegIndex];
+  const kId=document.getElementById('liveKeeperSelect').value;
+  const k=state.players.find(p=>p.id===kId);
+  if(k) seg.keeper=k;
+  if(seg.field.length>state.formation-1){ seg.bench = seg.bench.concat(seg.field.splice(state.formation-1)); }
+  const onIds=new Set([seg.keeper.id, ...seg.field.map(p=>p.id)]);
+  seg.bench = state.players.filter(p=>p.present && !onIds.has(p.id));
+  renderSchedule(lastSchedule); applyLiveSegment(); highlightRow();
+});
+document.getElementById('stopPlayerBtn').addEventListener('click', ()=>{
+  const pid=document.getElementById('stopPlayerSelect').value;
+  const p=state.players.find(x=>x.id===pid); if(!p) return;
+  p.present=false; save();
+  const minutesSeed = playedMinutesUpTo(curSegIndex);
+  const sched = generateSchedule(curSegIndex, minutesSeed);
+  renderSchedule(sched); applyLiveSegment(); highlightRow();
+});
+document.getElementById('recalcBtn').addEventListener('click', ()=>{
+  const minutesSeed = playedMinutesUpTo(curSegIndex);
+  const sched = generateSchedule(curSegIndex, minutesSeed);
+  renderSchedule(sched); applyLiveSegment(); highlightRow();
+});
+
+function playedMinutesUpTo(idx){
+  const present = state.players.filter(p=>p.present);
+  const map = new Map(present.map(p=>[p.id,0]));
+  for(let i=0; i<Math.min(idx,lastSchedule.length); i++){
+    const sl=lastSchedule[i]; const d=sl.duration;
+    if(sl.keeper) map.set(sl.keeper.id, (map.get(sl.keeper.id)||0)+d);
+    sl.field.forEach(p=> map.set(p.id, (map.get(p.id)||0)+d));
+  }
+  return map;
+}
+
+// generate
+document.getElementById('generateBtn').addEventListener('click', ()=>{
+  curSegIndex=0; elapsedSec=0; paused=true; if(timer){clearInterval(timer); timer=null;}
+  const sched = generateSchedule(0,null);
+  renderSchedule(sched); computeQuarterLen(); updateTimeUI(); applyLiveSegment(); highlightRow(); save();
+});
+
+function init(){
+  renderPlayers();
+  applyStrictUI();
+  refreshSummaries();
+  computeQuarterLen();
+}
+init();
+</script>
+</body>
+</html>
