@@ -23,7 +23,7 @@
   .tab button.active{background:var(--accent);border-color:transparent}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;margin:8px 0}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .btn{padding:12px 14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-weight:700}
+  .btn{padding:12px 14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
   .btn.secondary{background:#1f2937}
   .btn.danger{background:var(--danger)}
   .btn.small{padding:8px 10px;font-weight:600}
@@ -51,9 +51,7 @@
   .swaplist{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0}
   .swaplist .col{flex:1 1 220px;background:#0b1324;border:1px solid var(--border);border-radius:12px;padding:12px}
   .swaplist h3{margin:0 0 8px;font-size:16px}
-  .namechip{padding:10px;border:1px solid var(--border);border-radius:10px;margin:6px 0;background:#0a1322}
   .muted{color:var(--muted)}
-  .footerNote{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
   .no-scroll-x{overflow-x:hidden}
   .bar{height:8px;border-radius:8px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
   .bar>div{height:100%;background:#16a34a;width:0%}
@@ -85,7 +83,6 @@
         <div class="row"><button class="btn small" id="btnAdd">+ Speler</button><button class="btn small danger" id="btnReset">Reset team</button></div>
       </div>
       <div id="playerList" class="list"></div>
-      <div class="footerNote">Bovenaan = beste, onderaan = minst sterk (ranking is onzichtbaar in UI).</div>
     </div>
     <div class="row"><button class="btn" id="btnSaveSetup">Opslaan & Naar Live</button></div>
   </section>
@@ -130,30 +127,59 @@
   </section>
 </div>
 
-<div class="overlay hidden" id="swapOverlay"><div class="panel"><h2>Wisselmoment</h2><div class="swaplist"><div class="col"><h3>Uit</h3><div id="swapOut"></div></div><div class="col"><h3>In</h3><div id="swapIn"></div></div></div><button class="btn" id="btnDidSwap">Gewisseld</button></div></div>
-
 <script>
-const storeKey='wisselplanner.v10';
+const storeKey='wisselplanner.v11';
 const POS=['Aanvaller','Middenvelder','Verdediger'];
 const DEFAULT_ORDER=['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
-let state={team:'Team',formation:5,players:[],keepersMode:1,keeperByQuarter:[],q:1,viewQ:1,schedule:[],plannedMinutes:{}};
+
+let state={team:'De Esch O9',formation:5,players:[],keepersMode:1,keeperByQuarter:[],q:1,viewQ:1,schedule:[],plannedMinutes:{}};
 
 function uid(){return Math.random().toString(36).slice(2,9)}
 function save(){localStorage.setItem(storeKey,JSON.stringify(state))}
-function load(){const raw=localStorage.getItem(storeKey); if(raw){state=JSON.parse(raw);} else {resetTeamHard();}}
-function resetTeamHard(){state.team='De Esch O9'; state.formation=5; state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name=n,pos:POS[i%3],present:true,minutes:0,benchCd:0})); state.keepersMode=1; state.keeperByQuarter=[state.players[0].id,state.players[0].id,state.players[0].id,state.players[0].id]; state.q=1; state.viewQ=1; recomputeAll(); save();}
+function load(){const raw=localStorage.getItem(storeKey); if(raw){try{state=JSON.parse(raw);}catch(e){}}}
+function ensureDefaults(){
+  if(!state.players || !Array.isArray(state.players) || state.players.length===0){
+    state.players = DEFAULT_ORDER.map((n,i)=>({id:uid(),name: n,pos: POS[i%3],present:true,minutes:0,benchCd:0}));
+  }
+  if(!state.keeperByQuarter || state.keeperByQuarter.length!==4){
+    const first = state.players[0]?.id || null;
+    state.keeperByQuarter = [first,first,first,first];
+  }
+  if(!state.q) state.q=1;
+  if(!state.viewQ) state.viewQ=1;
+}
 
 function presentPlayers(){return state.players.filter(p=>p.present)}
 function nameBy(id){const p=state.players.find(x=>x.id===id); return p?p.name:'—'}
 function playerBy(id){return state.players.find(x=>x.id===id)}
 function getKeeperForQuarter(q){return state.keeperByQuarter[q-1]}
 
-function buildQuarterKeeperDefaults(){
-  const ps=presentPlayers(); const first=ps[0]?.id||null;
-  if(state.keepersMode===1){state.keeperByQuarter=[first,first,first,first];}
-  else if(state.keepersMode===2){const second=ps[1]?.id||first; state.keeperByQuarter=[first,first,second,second];}
-  else {state.keeperByQuarter=[ps[0]?.id||first,ps[1]?.id||first,ps[2]?.id||first,ps[3]?.id||first];}
+function rebuildKeeperAssignRow(containerId,prefix){
+  const row=document.getElementById(containerId); row.innerHTML='';
+  const ps=presentPlayers(); const opts=ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  if(state.keepersMode===1){
+    const id=`${prefix}-all`; row.innerHTML=`<select id="${id}">${opts}</select>`;
+    document.getElementById(id).value=state.keeperByQuarter[0]||ps[0]?.id||'';
+  }else if(state.keepersMode===2){
+    const a=`${prefix}-h1`, b=`${prefix}-h2`;
+    row.innerHTML=`<div class="grid2" style="width:100%"><div><label>1e helft</label><select id="${a}">${opts}</select></div><div><label>2e helft</label><select id="${b}">${opts}</select></div></div>`;
+    document.getElementById(a).value=state.keeperByQuarter[0]||ps[0]?.id||'';
+    document.getElementById(b).value=state.keeperByQuarter[2]||ps[1]?.id||'';
+  }else{
+    const ids=[`${prefix}-q1`,`${prefix}-q2`,`${prefix}-q3`,`${prefix}-q4`];
+    row.innerHTML=`<div class="grid2" style="width:100%">${ids.map((id,i)=>`<div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>`).join('')}</div>`;
+    ids.forEach((id,i)=>{document.getElementById(id).value=state.keeperByQuarter[i]||ps[i%ps.length]?.id||'';});
+  }
 }
+
+function readKeeperAssign(prefix){
+  const ps=presentPlayers();
+  const val = id => {const el=document.getElementById(id); return el?el.value:(ps[0]?.id||null)};
+  if(state.keepersMode===1){const k=val(`${prefix}-all`); state.keeperByQuarter=[k,k,k,k];}
+  else if(state.keepersMode===2){const k1=val(`${prefix}-h1`),k2=val(`${prefix}-h2`); state.keeperByQuarter=[k1,k1,k2,k2];}
+  else {state.keeperByQuarter=[val(`${prefix}-q1`),val(`${prefix}-q2`),val(`${prefix}-q3`),val(`${prefix}-q4`)]}
+}
+
 function canBeBenched(id){return (playerBy(id)?.benchCd||0)<=0}
 function decayCooldown(){state.players.forEach(p=>{if(p.benchCd>0)p.benchCd--;});}
 function markBenched(id){const p=playerBy(id); if(p) p.benchCd=1;}
@@ -163,24 +189,61 @@ function recomputeAll(){
   const cds=state.players.map(p=>({id:p.id,cd:p.benchCd||0}));
   for(let q=1;q<=4;q++){
     const k=getKeeperForQuarter(q);
-    const order=state.players.filter(p=>p.present&&p.id!==k).map(p=>p.id);
+    const order=state.players.filter(p=>p.present && p.id!==k).map(p=>p.id);
     let field=order.slice(0,state.formation), bench=order.slice(state.formation);
-    addPlanned([...field,k],5); state.schedule.push({q,slot:1,start:0,end:5,keeper:k,field:[...field],bench:[...bench],out:[],inn:[]});
+    addPlanned([...field,k],5);
+    state.schedule.push({q,slot:1,start:0,end:5,keeper:k,field:[...field],bench:[...bench],out:[],inn:[]});
     decayCooldown();
     const out=chooseOut(field), inn=chooseIn(bench);
     field=field.map(x=>x===out?inn:x); bench=bench.map(x=>x===inn?out:x);
     markBenched(out);
-    addPlanned([...field,k],5); state.schedule.push({q,slot:2,start:5,end:10,keeper:k,field:[...field],bench:[...bench],out:[out],inn:[inn]});
+    addPlanned([...field,k],5);
+    state.schedule.push({q,slot:2,start:5,end:10,keeper:k,field:[...field],bench:[...bench],out:[out],inn:[inn]});
     decayCooldown();
   }
   cds.forEach(({id,cd})=>{const p=playerBy(id); if(p) p.benchCd=cd;});
-  state.viewQ=state.q; // altijd bekijken = huidig kwart
+  state.viewQ=state.q;
   save();
 }
 function addPlanned(ids,mins){ids.forEach(id=>{state.plannedMinutes[id]=(state.plannedMinutes[id]||0)+mins;});}
 function chooseOut(field){const s=field.slice().sort((a,b)=>state.plannedMinutes[b]-state.plannedMinutes[a]); return s.find(canBeBenched)||field[0]}
 function chooseIn(bench){const s=bench.slice().sort((a,b)=>state.plannedMinutes[a]-state.plannedMinutes[b]); return s[0]||bench[0]}
-function getRow(q,slot){return state.schedule.find(r=>r.q===q&&r.slot===slot)}
+function getRow(q,slot){return state.schedule.find(r=>r.q===q && r.slot===slot)}
+
+function renderPlayersList(){
+  const list=document.getElementById('playerList'); list.innerHTML='';
+  let dragId=null;
+  state.players.forEach(p=>{
+    const el=document.createElement('div'); el.className='player'; el.draggable=true; el.dataset.id=p.id;
+    el.innerHTML=`<div class="drag" title="sleep">☰</div>
+      <div class="name" contenteditable="true" spellcheck="false">${p.name}</div>
+      <select class="pos">${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select>
+      <div class="present"><input type="checkbox" ${p.present?'checked':''}></div>
+      <div class="del"><button class="btn small danger" title="Verwijderen">🗑</button></div>`;
+    el.querySelector('.name').addEventListener('input',e=>{p.name=e.target.textContent.trim(); save();});
+    el.querySelector('.pos').addEventListener('change',e=>{p.pos=e.target.value; save();});
+    el.querySelector('.present input').addEventListener('change',e=>{p.present=e.target.checked; save();});
+    el.querySelector('.del button').addEventListener('click',()=>{state.players=state.players.filter(x=>x.id!==p.id); save(); renderPlayersList();});
+    el.addEventListener('dragstart',()=>{dragId=p.id;});
+    el.addEventListener('dragover',e=>{e.preventDefault(); el.style.outline='2px solid var(--accent)';});
+    el.addEventListener('dragleave',()=>{el.style.outline='none'});
+    el.addEventListener('drop',()=>{
+      el.style.outline='none';
+      const from=state.players.findIndex(x=>x.id===dragId);
+      const to=state.players.findIndex(x=>x.id===p.id);
+      if(from>-1&&to>-1&&from!=to){const it=state.players.splice(from,1)[0]; state.players.splice(to,0,it); save(); renderPlayersList();}
+    });
+    list.appendChild(el);
+  });
+}
+
+function renderSetup(){
+  document.getElementById('teamName').value=state.team;
+  document.getElementById('formation').value=String(state.formation);
+  document.getElementById('keepersMode').value=String(state.keepersMode);
+  rebuildKeeperAssignRow('keeperAssignRow','keepk');
+  renderPlayersList();
+}
 
 function renderLive(){
   document.getElementById('lblQuarter').textContent=`Kwart ${state.q} / 4`;
@@ -189,98 +252,109 @@ function renderLive(){
   document.getElementById('liveKeeper').textContent=nameBy(r1?.keeper)||'—';
   document.getElementById('liveField').textContent=(r1?.field||[]).map(nameBy).join(', ')||'—';
   document.getElementById('liveBench').textContent=(r1?.bench||[]).map(nameBy).join(', ')||'—';
-  const tb=document.querySelector('#scheduleTable tbody'); tb.innerHTML=''; state.schedule.filter(r=>r.q===state.viewQ).forEach(r=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`; tb.appendChild(tr);});
-}
-function renderSetup(){
-  document.getElementById('teamName').value=state.team;
-  document.getElementById('formation').value=String(state.formation);
-  document.getElementById('keepersMode').value=String(state.keepersMode);
-  keeperAssignRow('keeperAssignRow','keepk');
-  renderPlayersList();
-}
-function renderPlayersList(){
-  const list=document.getElementById('playerList'); list.innerHTML='';
-  let dragId=null;
-  state.players.forEach(p=>{
-    const el=document.createElement('div'); el.className='player'; el.draggable=true; el.dataset.id=p.id;
-    el.innerHTML=`<div class="drag">☰</div><div class="name" contenteditable="true">${p.name}</div><select class="pos">${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select><div class="present"><input type="checkbox" ${p.present?'checked':''}></div><div class="del"><button class="btn small danger">🗑</button></div>`;
-    el.querySelector('.name').addEventListener('input',e=>{p.name=e.target.textContent.trim(); save();});
-    el.querySelector('.pos').addEventListener('change',e=>{p.pos=e.target.value; save();});
-    el.querySelector('.present input').addEventListener('change',e=>{p.present=e.target.checked; save();});
-    el.querySelector('.del button').addEventListener('click',()=>{state.players=state.players.filter(x=>x.id!==p.id); save(); renderPlayersList();});
-    el.addEventListener('dragstart',()=>{dragId=p.id;});
-    el.addEventListener('dragover',e=>{e.preventDefault(); el.style.outline='2px solid var(--accent)';});
-    el.addEventListener('dragleave',()=>{el.style.outline='none'});
-    el.addEventListener('drop',()=>{el.style.outline='none'; const from=state.players.findIndex(x=>x.id===dragId); const to=state.players.findIndex(x=>x.id===p.id); if(from>-1&&to>-1&&from!==to){const item=state.players.splice(from,1)[0]; state.players.splice(to,0,item); save(); renderPlayersList();}});
-    list.appendChild(el);
+  const tb=document.querySelector('#scheduleTable tbody'); tb.innerHTML='';
+  state.schedule.filter(r=>r.q===state.viewQ).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`;
+    tb.appendChild(tr);
   });
 }
-function keeperAssignRow(containerId,prefix){
-  const row=document.getElementById(containerId); row.innerHTML='';
-  const ps=presentPlayers(); const opts=ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  if(state.keepersMode===1){
-    const id=`${prefix}-all`; row.innerHTML=`<select id="${id}">${opts}</select>`; document.getElementById(id).value=state.keeperByQuarter[0]||ps[0]?.id||'';
-  }else if(state.keepersMode===2){
-    const a=`${prefix}-h1`,b=`${prefix}-h2`; row.innerHTML=`<div class="grid2" style="width:100%"><div><label>1e helft</label><select id="${a}">${opts}</select></div><div><label>2e helft</label><select id="${b}">${opts}</select></div></div>`; document.getElementById(a).value=state.keeperByQuarter[0]||ps[0]?.id||''; document.getElementById(b).value=state.keeperByQuarter[2]||ps[1]?.id||'';
-  }else{
-    const ids=[`${prefix}-q1`,`${prefix}-q2`,`${prefix}-q3`,`${prefix}-q4`]; row.innerHTML=`<div class="grid2" style="width:100%">${ids.map((id,i)=>`<div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>`).join('')}</div>`; ids.forEach((id,i)=>{document.getElementById(id).value=state.keeperByQuarter[i]||ps[i%ps.length]?.id||'';});
-  }
-}
-function readKeeperAssign(prefix){
-  const ps=presentPlayers(); function val(id){const s=document.getElementById(id); return s?s.value:(ps[0]?.id||null);}
-  if(state.keepersMode===1){const k=val(`${prefix}-all`); state.keeperByQuarter=[k,k,k,k];}
-  else if(state.keepersMode===2){const k1=val(`${prefix}-h1`),k2=val(`${prefix}-h2`); state.keeperByQuarter=[k1,k1,k2,k2];}
-  else {state.keeperByQuarter=[val(`${prefix}-q1`),val(`${prefix}-q2`),val(`${prefix}-q3`),val(`${prefix}-q4`)]}
+
+function renderQuick(){
+  const cont=document.getElementById('quickActive'); cont.innerHTML='';
+  state.players.forEach(p=>{
+    const line=document.createElement('div'); line.className='player';
+    line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`;
+    line.querySelector('input').addEventListener('change',e=>{p.present=e.target.checked; save();});
+    cont.appendChild(line);
+  });
+  const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
+  rebuildKeeperAssignRow('quickKeeperAssign','quickk');
 }
 
 function renderDist(){
-  const swapsBody=document.querySelector('#distSwaps tbody'); swapsBody.innerHTML=''; state.schedule.filter(r=>r.slot===2).forEach(r=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.q}</td><td>${r.slot}</td><td>${r.out.map(nameBy).join(', ')||'—'}</td><td>${r.inn.map(nameBy).join(', ')||'—'}</td>`; swapsBody.appendChild(tr);});
-  const minutesBody=document.querySelector('#distMinutes tbody'); minutesBody.innerHTML=''; const rows=state.players.map(p=>({id:p.id,name:p.name,m:state.plannedMinutes[p.id]||0})).sort((a,b)=>b.m-a.m); const total=rows.reduce((s,x)=>s+x.m,0)||1, avg=total/rows.length; rows.forEach(e=>{const tr=document.createElement('tr'); const pct=Math.min(100,(e.m/(avg||1))*100); tr.innerHTML=`<td>${e.name}</td><td>${e.m} min</td><td><div class="bar"><div style="width:${pct}%"></div></div></td>`; minutesBody.appendChild(tr);});
+  const swaps=document.querySelector('#distSwaps tbody'); swaps.innerHTML='';
+  state.schedule.filter(r=>r.slot===2).forEach(r=>{
+    const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.q}</td><td>${r.slot}</td><td>${r.out.map(nameBy).join(', ')||'—'}</td><td>${r.inn.map(nameBy).join(', ')||'—'}</td>`; swaps.appendChild(tr);
+  });
+  const mins=document.querySelector('#distMinutes tbody'); mins.innerHTML='';
+  const rows=state.players.map(p=>({id:p.id,name:p.name,m:state.plannedMinutes[p.id]||0})).sort((a,b)=>b.m-a.m);
+  const total=rows.reduce((s,x)=>s+x.m,0)||1, avg=total/rows.length;
+  rows.forEach(e=>{const tr=document.createElement('tr'); const pct=Math.min(100,(e.m/(avg||1))*100); tr.innerHTML=`<td>${e.name}</td><td>${e.m} min</td><td><div class="bar"><div style="width:${pct}%"></div></div></td>`; mins.appendChild(tr);});
 }
-function renderAll(){renderSetup(); state.viewQ=state.q; renderLive(); renderDist();}
 
+function recomputeAndGoLive(){
+  recomputeAll(); save();
+  document.querySelector('.tab button[data-tab="live"]').click();
+  state.viewQ=state.q; renderLive();
+}
+
+/* --- Events --- */
 document.querySelectorAll('.tab button').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
     ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-    const id=btn.dataset.tab==='setup'?'tab-setup':btn.dataset.tab==='live'?'tab-live':btn.dataset.tab==='quick'?'tab-quick':'tab-dist';
+    const id = btn.dataset.tab==='setup'?'tab-setup': btn.dataset.tab==='live'?'tab-live': btn.dataset.tab==='quick'?'tab-quick':'tab-dist';
     document.getElementById(id).classList.remove('hidden');
+    if(id==='tab-setup') renderSetup();
     if(id==='tab-live'){ state.viewQ=state.q; renderLive(); }
-    if(id==='tab-quick'){ renderQuick(); }
-    if(id==='tab-dist'){ renderDist(); }
-    if(id==='tab-setup'){ renderSetup(); }
+    if(id==='tab-quick') renderQuick();
+    if(id==='tab-dist') renderDist();
   });
 });
+
+document.getElementById('btnAdd').addEventListener('click',()=>{
+  state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,minutes:0,benchCd:0});
+  save(); renderPlayersList();
+});
+document.getElementById('btnReset').addEventListener('click',()=>{
+  if(confirm('Team resetten naar vaste 8 spelers?')){
+    state.players = DEFAULT_ORDER.map((n,i)=>({id:uid(),name: n,pos: POS[i%3],present:true,minutes:0,benchCd:0}));
+    // reset keepers ook
+    const first=state.players[0].id; state.keeperByQuarter=[first,first,first,first];
+    recomputeAndGoLive();
+  }
+});
+document.getElementById('keepersMode').addEventListener('change',()=>{
+  state.keepersMode = Number(document.getElementById('keepersMode').value)||1;
+  // rebuild keuzes + defaults
+  const ps=presentPlayers(); const first=ps[0]?.id||null;
+  if(state.keepersMode===1){state.keeperByQuarter=[first,first,first,first];}
+  else if(state.keepersMode===2){const second=ps[1]?.id||first; state.keeperByQuarter=[first,first,second,second];}
+  else {state.keeperByQuarter=[ps[0]?.id||first,ps[1]?.id||first,ps[2]?.id||first,ps[3]?.id||first];}
+  rebuildKeeperAssignRow('keeperAssignRow','keepk');
+  save();
+});
+
+document.getElementById('btnSaveSetup').addEventListener('click',()=>{
+  state.team = document.getElementById('teamName').value.trim()||'Team';
+  state.formation = Number(document.getElementById('formation').value)||5;
+  state.keepersMode = Number(document.getElementById('keepersMode').value)||1;
+  readKeeperAssign('keepk');
+  recomputeAndGoLive();
+});
+
+// Live kwart navigatie
 document.getElementById('btnPrevView').addEventListener('click',()=>{state.viewQ=Math.max(1,state.viewQ-1); renderLive();});
 document.getElementById('btnCurr').addEventListener('click',()=>{state.viewQ=state.q; renderLive();});
 document.getElementById('btnNext').addEventListener('click',()=>{state.viewQ=Math.min(4,state.viewQ+1); renderLive();});
 
-document.getElementById('btnAdd').addEventListener('click',()=>{state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,minutes:0,benchCd:0}); save(); renderPlayersList();});
-document.getElementById('btnReset').addEventListener('click',()=>{ if(confirm('Team resetten naar vaste 8 spelers?')){ resetTeamHard(); renderAll(); }});
-document.getElementById('keepersMode').addEventListener('change',()=>{ state.keepersMode=Number(document.getElementById('keepersMode').value)||1; buildQuarterKeeperDefaults(); keeperAssignRow('keeperAssignRow','keepk'); save(); });
-document.getElementById('btnSaveSetup').addEventListener('click',()=>{
-  state.team=document.getElementById('teamName').value.trim()||'Team';
-  state.formation=Number(document.getElementById('formation').value)||5;
-  state.keepersMode=Number(document.getElementById('keepersMode').value)||1;
-  readKeeperAssign('keepk'); recomputeAll(); save();
-  document.querySelector('.tab button[data-tab="live"]').click();
-  state.viewQ=state.q; renderLive();
-});
-
-function renderQuick(){
-  const cont=document.getElementById('quickActive'); cont.innerHTML=''; state.players.forEach(p=>{const line=document.createElement('div'); line.className='player'; line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`; line.querySelector('input').addEventListener('change',e=>{p.present=e.target.checked; save();}); cont.appendChild(line); });
-  const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
-  keeperAssignRow('quickKeeperAssign','quickk');
-}
+// Snelle wijzigingen
 document.getElementById('btnQuickRecalc').addEventListener('click',()=>{
-  state.formation=Number(document.getElementById('quickFormation').value)||state.formation;
-  readKeeperAssign('quickk'); recomputeAll(); save();
+  state.formation = Number(document.getElementById('quickFormation').value)||state.formation;
+  readKeeperAssign('quickk');
+  recomputeAndGoLive();
+});
+document.getElementById('btnQuickToLive').addEventListener('click',()=>{
   document.querySelector('.tab button[data-tab="live"]').click();
   state.viewQ=state.q; renderLive();
 });
-document.getElementById('btnQuickToLive').addEventListener('click',()=>{ document.querySelector('.tab button[data-tab="live"]').click(); state.viewQ=state.q; renderLive(); });
 
-load(); buildQuarterKeeperDefaults(); recomputeAll(); renderAll();
+/* --- Bootstrap --- */
+load();
+ensureDefaults();
+recomputeAll();
+renderSetup(); // initial render of setup (first tab active)
 </script>
 </body>
 </html>
