@@ -478,24 +478,132 @@ function populateChangesUI(i){
   seg.bench.forEach(p=>{ const chip=document.createElement('span'); chip.className='chip'; chip.textContent=p.name; chip.onclick=()=>{ if(seg.field.length<state.formation-1){ seg.bench=seg.bench.filter(x=>x.id!==p.id); seg.field.push(p); setLive(i); populateChangesUI(i); } }; be.appendChild(chip); });
 }
 
-/* Wijzigingen */
-$('applyLiveBtn').onclick=()=>{ const seg=lastSchedule[curIndex]; const id=$('liveKeeperSelect').value; const found=state.players.find(p=>p.id===id); if(found){ seg.keeper=found; renderSchedule(lastSchedule); setLive(curIndex); populateChangesUI(curIndex);} };
-$('stopPlayerBtn').onclick=()=>{ const id=$('stopPlayerSelect').value; const p=state.players.find(x=>x.id===id); if(!p) return; p.present=false; save();
-  const seed=new Map(); for(let i=0;i<curIndex;i++){ const sl=lastSchedule[i]; const d=sl.duration; seed.set(sl.keeper.id,(seed.get(sl.keeper.id)||0)+d); sl.field.forEach(pl=> seed.set(pl.id,(seed.get(pl.id)||0)+d)); }
-  const s=generateSchedule(curIndex, seed); lastSchedule= lastSchedule.slice(0,curIndex).concat(s.slice(curIndex)); renderSchedule(lastSchedule); setLive(curIndex); populateChangesUI(curIndex);
-};
-$('recalcBtn').onclick=()=>{ const seed=new Map(); for(let i=0;i<curIndex;i++){ const sl=lastSchedule[i]; const d=sl.duration; seed.set(sl.keeper.id,(seed.get(sl.keeper.id)||0)+d); sl.field.forEach(pl=> seed.set(pl.id,(seed.get(pl.id)||0)+d)); }
-  const s=generateSchedule(curIndex, seed); lastSchedule=s; renderSchedule(s); setLive(curIndex); populateChangesUI(curIndex);
-};
+// === Tijd-helpers voor live herberekenen ===
+function getTimeProgress(){
+  // huidig slot en hoeveel seconden daarvan al gespeeld is
+  const stepSec = state.subInterval * 60;
+  const curSlot = Math.min(
+    Math.floor(elapsed / stepSec),
+    Math.max(0, lastSchedule.length - 1)
+  );
+  const slotElapsedSec = Math.max(0, elapsed - curSlot * stepSec);
+  return { curSlot, slotElapsedSec, stepSec };
+}
 
-/* Genereren / Timer / Wissel NU */
-$('generateBtn').onclick=()=>{ const s=generateSchedule(0,null); renderSchedule(s); location.hash='#live'; };
-let timer=null,startMs=0,elapsed=0;
-function tick(){
-  const now=performance.now(); elapsed=(now-startMs)/1000; $('elapsed').textContent=fmt(elapsed);
-  const step=state.subInterval*60; const next=(Math.ceil(elapsed/step)*step)-elapsed; $('toNext').textContent=fmt(Math.max(0,next));
-  const prevSlot=Math.floor((elapsed-0.25)/step), curSlot=Math.floor(elapsed/step);
-  if(curSlot>prevSlot){ const idx=Math.min(curSlot,lastSchedule.length-1); setLive(idx); populateChangesUI(idx); vibrate([200,100,200]); }
+// Bouw een minuten-seed tot "untilIndex"; optioneel inclusief deel-minuten van huidig slot
+function buildSeedMinutes(untilIndex, includePartial){
+  const m = new Map();
+  const end = Math.min(untilIndex, lastSchedule.length);
+  for (let i = 0; i < end; i++){
+    const sl = lastSchedule[i];
+    const d = sl.duration; // in minuten
+    m.set(sl.keeper.id, (m.get(sl.keeper.id)||0) + d);
+    sl.field.forEach(pl => m.set(pl.id, (m.get(pl.id)||0) + d));
+  }
+  if (includePartial && lastSchedule[untilIndex]){
+    const sl = lastSchedule[untilIndex];
+    const { slotElapsedSec } = getTimeProgress();
+    const add = Math.min(sl.duration, Math.max(0, slotElapsedSec / 60)); // min
+    m.set(sl.keeper.id, (m.get(sl.keeper.id)||0) + add);
+    sl.field.forEach(pl => m.set(pl.id, (m.get(pl.id)||0) + add));
+  }
+  return m;
+}
+
+// Recalc schema vanaf "nu" (houdt rekening met reeds gespeelde minuten)
+function getTimeProgress(){
+  const stepSec = state.subInterval * 60;
+  const curSlot = Math.min(
+    Math.floor(elapsed / stepSec),
+    Math.max(0, lastSchedule.length - 1)
+  );
+  const slotElapsedSec = Math.max(0, elapsed - curSlot * stepSec);
+  return { curSlot, slotElapsedSec, stepSec };
+}
+
+function buildSeedMinutes(untilIndex, includePartial){
+  const m = new Map();
+  const end = Math.min(untilIndex, lastSchedule.length);
+  for (let i = 0; i < end; i++){
+    const sl = lastSchedule[i];
+    const d = sl.duration; // minuten
+    m.set(sl.keeper.id, (m.get(sl.keeper.id)||0) + d);
+    sl.field.forEach(pl => m.set(pl.id, (m.get(pl.id)||0) + d));
+  }
+  if (includePartial && lastSchedule[untilIndex]){
+    const sl = lastSchedule[untilIndex];
+    const { slotElapsedSec } = getTimeProgress();
+    const add = Math.min(sl.duration, Math.max(0, slotElapsedSec / 60)); // min
+    m.set(sl.keeper.id, (m.get(sl.keeper.id)||0) + add);
+    sl.field.forEach(pl => m.set(pl.id, (m.get(pl.id)||0) + add));
+  }
+  return m;
+}
+
+function recalcFromNow(){
+  if (!lastSchedule || !lastSchedule.length) return;
+  const { curSlot } = getTimeProgress();
+  const seed = buildSeedMinutes(curSlot, true); // tel deel van huidig slot mee
+  const s = generateSchedule(curSlot, seed);
+  // vast gedeelte behouden, rest vervangen
+  lastSchedule = lastSchedule.slice(0, curSlot).concat(s.slice(curSlot));
+  renderSchedule(lastSchedule);
+  setLive(curSlot);
+  populateChangesUI(curSlot);
+}
+
+// 2) Nieuwe handlers die de rest van de wedstrijd herberekenen
+
+function onApplyKeeper(){
+  if (!lastSchedule || !lastSchedule.length) return;
+  const { curSlot } = getTimeProgress();
+  const seg = lastSchedule[curSlot];
+
+  // keeperkeuze voor huidig slot toepassen
+  const id = document.getElementById('liveKeeperSelect').value;
+  const found = state.players.find(p => p.id === id && p.present);
+  if (found){
+    // zorg dat keeper niet in field zit
+    seg.field = seg.field.filter(p => p.id !== found.id);
+    // bank opnieuw afleiden uit alle aanwezigen
+    const present = state.players.filter(p => p.present);
+    seg.bench = present.filter(p => p.id !== found.id && !seg.field.find(f => f.id === p.id));
+    seg.keeper = found;
+  }
+
+  recalcFromNow();
+}
+
+function onStopPlayer(){
+  if (!lastSchedule || !lastSchedule.length) return;
+  const id = document.getElementById('stopPlayerSelect').value;
+  const p = state.players.find(x => x.id === id);
+  if (!p) return;
+
+  // markeer speler als afwezig
+  p.present = false;
+  // haal hem uit huidig slot als nodig
+  const { curSlot } = getTimeProgress();
+  const seg = lastSchedule[curSlot];
+  if (seg){
+    if (seg.keeper && seg.keeper.id === p.id){
+      // eenvoudige fallback: kies eerste aanwezige die niet al op veld staat
+      const pool = state.players.filter(x => x.present && !seg.field.find(f => f.id === x.id));
+      if (pool.length) seg.keeper = pool[0];
+    }
+    seg.field = seg.field.filter(x => x.id !== p.id);
+    seg.bench = seg.bench.filter(x => x.id !== p.id);
+  }
+
+  // opslag en herberekenen vanaf NU met echte speeltijd
+  try { localStorage.setItem(storeKey, JSON.stringify(state)); } catch(e){}
+  recalcFromNow();
+}
+
+// 3) Knoppen (re)binden — dit overschrijft evt. eerdere onclicks
+document.getElementById('applyLiveBtn').onclick  = onApplyKeeper;
+document.getElementById('stopPlayerBtn').onclick  = onStopPlayer;
+document.getElementById('recalcBtn').onclick      = recalcFromNow;
 }
 $('startBtn').onclick=()=>{ if(!lastSchedule.length){ alert('Genereer eerst een schema.'); return; } if(!timer){ startMs=performance.now()-elapsed*1000; timer=setInterval(tick,250);} };
 $('pauseBtn').onclick=()=>{ if(timer){ clearInterval(timer); timer=null; } };
