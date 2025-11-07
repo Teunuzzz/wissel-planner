@@ -274,10 +274,14 @@ function generateSchedule(fromIndex=0,seedMinutes=null){
     const keeper=keeperKey.get(key);
 
     let field=pickField(state.formation-1, present.filter(p=>p.id!==keeper.id), minutes, targetAvg);
-    let bench = present.filter(p=>p.id===keeper.id || !field.find(f=>f.id===p.id));
+    // GOED: bank = iedereen die niet speelt én niet de keeper is
+let bench = present.filter(p => p.id !== keeper.id && !field.find(f => f.id === p.id));
 
     // FIX: gebruik JS-logica (&&/||) i.p.v. and/or
-    const bad=bench.filter(p=> lastBench.has(p.id) && (i - lastBench.get(p.id) < BENCH_COOLDOWN) );
+    // GOED: sluit de keeper uit van cooldown-swaps
+const bad = bench.filter(p =>
+  p.id !== keeper.id && lastBench.has(p.id) && (i - lastBench.get(p.id) < BENCH_COOLDOWN)
+);
     if(bad.length){
       for(const b of bad){
         const sw = field.find(f=> !lastBench.has(f.id) || (i - lastBench.get(f.id) >= BENCH_COOLDOWN) );
