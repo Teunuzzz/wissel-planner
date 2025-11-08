@@ -54,6 +54,41 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 .namechip{padding:10px;border:1px solid var(--border);border-radius:10px;margin:6px 0;background:#0a1322}
 .bar{height:8px;border-radius:8px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
 .bar>div{height:100%;background:#16a34a;width:0%}
+/* Wedstrijdprogress in 4 segmenten */
+.match-progress{
+  position:relative;
+  height:14px;
+  border-radius:999px;
+  background:#0b1324;
+  border:1px solid var(--border);
+  overflow:hidden;
+}
+
+/* 4 segmentlijnen (25%, 50%, 75%) */
+.match-progress::after{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    linear-gradient(to right, transparent 24.5%, var(--border) 24.5%, var(--border) 25.5%, transparent 25.5%),
+    linear-gradient(to right, transparent 49.5%, var(--border) 49.5%, var(--border) 50.5%, transparent 50.5%),
+    linear-gradient(to right, transparent 74.5%, var(--border) 74.5%, var(--border) 75.5%, transparent 75.5%);
+  pointer-events:none;
+}
+
+.match-progress .fill{
+  position:absolute; left:0; top:0; height:100%;
+  background:var(--accent);
+  width:0%;
+}
+
+/* Marker van het huidige kwart */
+.match-progress .q-marker{
+  position:absolute; top:-3px; width:2px; height:20px;
+  background:#e5e7eb; border-radius:2px;
+  left:0%;
+  box-shadow:0 0 0 2px rgba(0,0,0,.25);
+}
+
 </style>
 </head>
 <body>
@@ -94,12 +129,21 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
       <button class="btn" id="btnStart">▶ Start</button>
       <button class="btn secondary" id="btnPause">⏸︎ Pauze</button>
     </div>
-    <div class="row" id="quarterNavRow">
-      <button class="btn secondary" id="btnPrevView">⏮ Vorig kwart</button>
-      <button class="btn" id="btnCurr">• Huidig kwart</button>
-      <button class="btn secondary" id="btnNext">⏭ Volgend kwart</button>
-    </div>
-    <div class="progress"><div id="progressBar"></div></div>
+    <!-- Wedstrijdprogress in 4 kwarten -->
+<div class="match-progress" id="matchProgress">
+  <div class="fill" id="matchFill"></div>
+  <div class="q-marker" id="quarterMarker" title="Voortgang huidig kwart"></div>
+</div>
+
+    <!-- Prominente wissel indicatie -->
+<div class="card" id="liveSwapCard">
+  <h3 style="margin:0 0 8px">Wissel bij 05:00</h3>
+  <div class="row" style="gap:12px;flex-wrap:wrap">
+    <div class="pill"><strong>UIT:</strong> <span id="liveSwapOut">—</span></div>
+    <div class="pill"><strong>IN:</strong> <span id="liveSwapIn">—</span></div>
+  </div>
+</div>
+
     <div class="card"><div class="row"><div class="pill"><strong>Keeper:</strong> <span id="liveKeeper">—</span></div><div class="pill"><strong>Veld:</strong> <span id="liveField">—</span></div><div class="pill"><strong>Bank:</strong> <span id="liveBench">—</span></div></div></div>
     <table class="table" id="scheduleTable"><thead><tr><th>Q•Slot</th><th>Tijd</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
   </section>
@@ -111,6 +155,23 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
       <div><label>Formatie aanpassen</label><select id="quickFormation"></select></div>
     </div></div></div>
     <div><label>Keeper wijzigen (volgens modus)</label><div id="quickKeeperAssign" class="row"></div></div>
+    <div class="card" id="quickManualSwap">
+  <h3 style="margin:0 0 8px">Huidig kwart – wissel aanpassen</h3>
+  <div class="grid2" style="width:100%">
+    <div>
+      <label>Uit (van veld)</label>
+      <select id="manualOut"></select>
+    </div>
+    <div>
+      <label>In (van bank)</label>
+      <select id="manualIn"></select>
+    </div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="btn" id="btnApplyManualSwap">Pas wissel aan</button>
+  </div>
+  <small class="muted">Dit wijzigt de wissel van dit kwart (05:00); minutenverdeling wordt vanaf dit kwart opnieuw berekend.</small>
+</div>
     <div class="row" style="margin-top:8px"><button class="btn" id="btnQuickRecalc">Herberekenen</button><button class="btn secondary" id="btnQuickToLive">Naar Live</button></div>
   </section>
 
@@ -444,26 +505,106 @@ function renderSetup(){
   renderPlayersList();
 }
 function renderLive(){
-  document.getElementById('lblQuarter').textContent=`Kwart ${state.q} / 4`;
-  document.getElementById('lblView').textContent=`Bekijken: ${state.viewQ} / 4`;
-  const r1=state.schedule.find(r=>r.q===state.viewQ && r.slot===1);
-  document.getElementById('liveKeeper').textContent = nameBy(r1?.keeper)||'—';
-  document.getElementById('liveField').textContent = (r1?.field||[]).map(nameBy).join(', ')||'—';
-  document.getElementById('liveBench').textContent = (r1?.bench||[]).map(nameBy).join(', ')||'—';
-  const tb=document.querySelector('#scheduleTable tbody'); tb.innerHTML='';
-  state.schedule.filter(r=>r.q===state.viewQ).forEach(r=>{
+  document.getElementById('lblQuarter').textContent = `Kwart ${state.q} / 4`;
+  // we tonen ALLEEN het actuele kwart
+  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
+  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
+
+  document.getElementById('liveKeeper').textContent = nameBy(r1?.keeper) || '—';
+  document.getElementById('liveField').textContent  = (r1?.field||[]).map(nameBy).join(', ') || '—';
+  document.getElementById('liveBench').textContent  = (r1?.bench||[]).map(nameBy).join(', ') || '—';
+
+  // Prominente wissel (05:00)
+  document.getElementById('liveSwapOut').textContent = (r2?.out||[]).map(nameBy).join(', ') || '—';
+  document.getElementById('liveSwapIn').textContent  = (r2?.inn||[]).map(nameBy).join(', ') || '—';
+
+  const tb = document.querySelector('#scheduleTable tbody'); tb.innerHTML='';
+  [r1,r2].filter(Boolean).forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`;
+    tr.innerHTML = `<td>${r.q}•${r.slot}</td>
+                    <td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td>
+                    <td>${r.field.map(nameBy).join(', ')}</td>
+                    <td>${r.bench.map(nameBy).join(', ')}</td>`;
     tb.appendChild(tr);
   });
   updateTimerUI();
 }
+
 function renderQuick(){
   const cont=document.getElementById('quickActive'); cont.innerHTML='';
   state.players.forEach(p=>{const line=document.createElement('div'); line.className='player'; line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`; line.querySelector('input').addEventListener('change',e=>{p.present=e.target.checked; save();}); cont.appendChild(line);});
   const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
   keeperAssignUI('quickKeeperAssign','quickk');
+  populateManualSwapUI();
 }
+function populateManualSwapUI(){
+  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
+  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
+  const outSel = document.getElementById('manualOut');
+  const inSel  = document.getElementById('manualIn');
+  if(!outSel || !inSel || !r1 || !r2){ return; }
+
+  outSel.innerHTML = r1.field.map(id=>`<option value="${id}">${nameBy(id)}</option>`).join('');
+  inSel.innerHTML  = r1.bench.map(id=>`<option value="${id}">${nameBy(id)}</option>`).join('');
+
+  // default: eerste uit/ in volgens de geplande swap (als er precies 1 is)
+  const defOut = (r2.out && r2.out[0]) || r1.field[0];
+  const defIn  = (r2.inn && r2.inn[0]) || r1.bench[0];
+  outSel.value = defOut || '';
+  inSel.value  = defIn  || '';
+}
+  
+function applyManualSwapForCurrentQuarter(){
+  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
+  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
+  if(!r1 || !r2) return;
+
+  const outId = document.getElementById('manualOut').value;
+  const inId  = document.getElementById('manualIn').value;
+  if(!outId || !inId || outId===inId) return;
+
+  // Bouw slot-2 veld op basis van slot-1 met de handmatige swap
+  const newField = r1.field.map(id => id===outId ? inId : id);
+  const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
+  const newBench = all.filter(id=>!newField.includes(id));
+
+  r2.field = newField;
+  r2.bench = newBench;
+  r2.out   = [outId];
+  r2.inn   = [inId];
+
+  // Speelminuten vanaf huidig kwart opnieuw tellen (fair naar voren toe)
+  // 1) reset geplande minuten
+  state.plannedMinutes = {};
+  state.players.forEach(p=> state.plannedMinutes[p.id]=0);
+  // 2) loop door schedule en tel vanaf Q1 t/m Q4 opnieuw
+  //    (maar gebruik r2 voor huidig kwart zoals net ingesteld)
+  const oldSchedule = state.schedule.map(s=>({...s}));
+  state.schedule = [];
+  let prevField = null;
+  for(let q=1;q<=4;q++){
+    const k = keeperFor(q);
+    // slot1: als q==state.q gebruik bestaande r1, anders herbouw
+    let s1 = (q===state.q) ? {...oldSchedule.find(x=>x.q===q && x.slot===1)} :
+                             buildSlot(q,1,k,prevField);
+    applySlotMinutes(s1);
+    state.schedule.push(s1);
+
+    // slot2: als q==state.q gebruik gemodificeerde r2, anders herbouw o.b.v. s1
+    let s2 = (q===state.q) ? {...r2} : buildSlot(q,2,k,s1.field);
+    applySlotMinutes(s2);
+    state.schedule.push(s2);
+
+    prevField = s2.field.slice();
+  }
+
+  save();
+  renderLive(); // live bijwerken
+  alert('Wissel voor dit kwart aangepast.');
+}
+document.getElementById('btnApplyManualSwap').addEventListener('click', applyManualSwapForCurrentQuarter);
+
+  
 function renderDist(){
   const body=document.querySelector('#distSwaps tbody'); body.innerHTML='';
   state.schedule.forEach(r=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${nameBy(r.keeper)}</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`; body.appendChild(tr);});
@@ -472,7 +613,27 @@ function renderDist(){
 
 /* ===== TIMER + OVERLAY ===== */
 function fmt(ms){const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000));const m=Math.floor(t/60);const s=String(t%60).padStart(2,'0');return `${m}:${s}`}
-function updateTimerUI(){document.getElementById('clock').textContent=fmt(state.elapsedMs); document.getElementById('progressBar').style.width=Math.min(100,(state.elapsedMs/state.quarterMs)*100)+'%';}
+function updateTimerUI(){
+  // Klok (huidig kwart)
+  document.getElementById('clock').textContent = fmt(state.elapsedMs);
+
+  // Totale voortgang (4 kwarten van 10:00)
+  const quarterMs = state.quarterMs;          // 600000
+  const totalMs   = 4 * quarterMs;            // 40:00
+  const totalElapsed = (state.q - 1) * quarterMs + state.elapsedMs;
+
+  // 1) vulling over de hele wedstrijd
+  const pctTotal = Math.min(100, (totalElapsed / totalMs) * 100);
+  const fill = document.getElementById('matchFill');
+  if (fill) fill.style.width = pctTotal + '%';
+
+  // 2) marker positie binnen het huidige kwart
+  const pctInQuarter = Math.min(100, (state.elapsedMs / quarterMs) * 100);   // 0..100
+  const markerLeft = (state.q - 1) * 25 + (pctInQuarter * 0.25);             // 0..100
+  const marker = document.getElementById('quarterMarker');
+  if (marker) marker.style.left = markerLeft + '%';
+}
+
 let tick=null;
 function start(){if(state.running) return; state.running=true; const base=Date.now()-state.elapsedMs; tick=setInterval(()=>{state.elapsedMs=Date.now()-base; if(!state.swappedThisQuarter && state.elapsedMs>=state.swapAtMs){showSwap(); state.swappedThisQuarter=true;} if(state.elapsedMs>=state.quarterMs){state.elapsedMs=state.quarterMs; pause();} updateTimerUI();},200);}
 function pause(){state.running=false; if(tick){clearInterval(tick); tick=null;} save();}
@@ -481,14 +642,10 @@ function hideSwap(){document.getElementById('swapOverlay').style.display='none';
 
 /* ===== NAV/EVENTS ===== */
 document.querySelectorAll('.tab button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id).classList.add('hidden')); const id=btn.dataset.tab==='setup'?'tab-setup':btn.dataset.tab==='live'?'tab-live':btn.dataset.tab==='quick'?'tab-quick':'tab-dist'; document.getElementById(id).classList.remove('hidden'); if(id==='tab-setup') renderSetup(); if(id==='tab-live'){state.viewQ=state.q; renderLive();} if(id==='tab-quick') renderQuick(); if(id==='tab-dist') renderDist();}));
-
 document.getElementById('btnAdd').addEventListener('click',()=>{state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,benchCd:0}); save(); renderPlayersList();});
 document.getElementById('btnReset').addEventListener('click',()=>{if(confirm('Team resetten naar vaste 8 spelers?')){state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name:n,pos:POS[i%3],present:true,benchCd:0})); const ps=state.players.map(p=>p.id); state.keeperByQuarter=[ps[0],ps[1]||ps[0],ps[2]||ps[0],ps[3]||ps[0]]; recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();}});
 document.getElementById('keepersMode').addEventListener('change',()=>{state.keepersMode=Number(document.getElementById('keepersMode').value)||1; keeperAssignUI('keeperAssignRow','keepk'); save();});
 document.getElementById('btnSaveSetup').addEventListener('click',()=>{state.team=document.getElementById('teamName').value.trim()||'Team'; state.formation=Number(document.getElementById('formation').value)||5; state.keepersMode=Number(document.getElementById('keepersMode').value)||1; readKeeperAssign('keepk'); recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();});
-document.getElementById('btnPrevView').addEventListener('click',()=>{state.viewQ=Math.max(1,state.viewQ-1); renderLive();});
-document.getElementById('btnCurr').addEventListener('click',()=>{state.viewQ=state.q; renderLive();});
-document.getElementById('btnNext').addEventListener('click',()=>{state.viewQ=Math.min(4,state.viewQ+1); renderLive();});
 document.getElementById('btnQuickRecalc').addEventListener('click',()=>{state.formation=Number(document.getElementById('quickFormation').value)||state.formation; readKeeperAssign('quickk'); recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();});
 document.getElementById('btnQuickToLive').addEventListener('click',()=>{document.querySelector('.tab button[data-tab="live"]').click(); state.viewQ=state.q; renderLive();});
 
