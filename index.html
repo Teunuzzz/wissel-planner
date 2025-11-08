@@ -97,6 +97,22 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 /* Kolommen Snelle wijzigingen */
 .col-field{background:rgba(246,197,0,.1);border:1px solid var(--accent)}
 .col-bench{background:rgba(10,19,36,.8);border:1px solid var(--border)}
+
+/* Snelle wijz. – twee kolommen */
+.quick-cols{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:560px){.quick-cols{grid-template-columns:1fr 1fr}}
+.quick-col{border:1px solid var(--border);border-radius:12px;padding:12px;background:#08172e}
+.quick-col h4{margin:0 0 8px;color:var(--accent)}
+.chips{display:flex;flex-direction:column;gap:8px}
+.chip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#0b162d}
+.chip .who{font-weight:700}
+.chip .act{display:flex;gap:6px}
+.chip .btn-move{padding:8px 10px;border:none;border-radius:10px;cursor:pointer;font-weight:700}
+.btn-to-bench{background:var(--accent);color:#000}
+.btn-to-field{background:#1e2b4a;color:#fff}
+.staged{outline:2px solid var(--accent)}
+.note{color:var(--muted);font-size:.9em}
+  
 </style>
 </head>
 
@@ -192,22 +208,28 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 
     <div><label>Keeper wijzigen (volgens modus)</label><div id="quickKeeperAssign" class="row"></div></div>
 
-    <div class="card" id="quickManualSwap">
-      <h3>Huidig kwart – wissel aanpassen</h3>
-      <div class="grid2" style="width:100%">
-        <div class="col-field"><label>Uit (van veld)</label><select id="manualOut"></select></div>
-        <div class="col-bench"><label>In (van bank)</label><select id="manualIn"></select></div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button class="btn" id="btnApplyManualSwap">Pas wissel aan</button>
-      </div>
-      <small class="muted">Bij aanpassen wordt de hele wedstrijd opnieuw herberekend met gelijke speelminuten.</small>
-    </div>
+<div class="card" id="quickManualSwap">
+  <h3 style="margin:0 0 8px">Huidig kwart – wissel aanpassen</h3>
 
-    <div class="row" style="margin-top:8px">
-      <button class="btn" id="btnQuickRecalc">Herberekenen</button>
-      <button class="btn secondary" id="btnQuickToLive">Naar Live</button>
+  <div class="quick-cols" id="quickSwapCols">
+    <div class="quick-col">
+      <h4>Veld</h4>
+      <div class="chips" id="quickFieldChips"></div>
+      <div class="note">Klik op <b>→ bank</b> bij degene die je <u>van het veld</u> wilt halen.</div>
     </div>
+    <div class="quick-col">
+      <h4>Bank</h4>
+      <div class="chips" id="quickBenchChips"></div>
+      <div class="note">Klik op <b>→ veld</b> bij degene die je <u>in wil brengen</u>.</div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:10px">
+    <button class="btn" id="btnApplyManualSwap">Pas wissel aan</button>
+  </div>
+  <small class="muted">Na bevestigen wordt de <b>hele wedstrijd</b> opnieuw gepland met zo gelijk mogelijke speelminuten.</small>
+</div>
+
   </section>
 
   <!-- TAB: Verdeling -->
@@ -248,7 +270,9 @@ const POS = ['Aanvaller','Middenvelder','Verdediger'];
 const DEFAULT_ORDER = ['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
 
 let state = {
-  team: 'De Esch O9',
+  quickSwapOut: null,   // id van speler die van veld gaat
+  quickSwapIn:  null,   // id van speler die van bank komt
+  team: 'De Esch O9-3',
   formation: 5,
   players: [],
   keepersMode: 4,
@@ -402,6 +426,11 @@ function makeSortable(container){
     }, {passive:false});
   });
 }
+function currentSlots(){
+  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
+  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
+  return {r1,r2};
+}
 
 /* ========== RENDER ========= */
 function renderPlayersList(){
@@ -456,6 +485,8 @@ function renderQuick(){
   });
   const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
   keeperAssignUI('quickKeeperAssign','quickk');
+  // In plaats van dropdowns:
+  renderQuickSwapCols();
   populateManualSwapUI();
 }
 function populateManualSwapUI(){
@@ -487,6 +518,42 @@ function renderDist(){
     mins.appendChild(tr);
   });
 }
+
+  function renderQuickSwapCols(){
+  const {r1, r2} = currentSlots();
+  const fieldBox = document.getElementById('quickFieldChips');
+  const benchBox = document.getElementById('quickBenchChips');
+  if(!r1 || !r2 || !fieldBox || !benchBox) return;
+
+  // defaults (gebruik geplande out/inn of eerste van lijsten)
+  if(!state.quickSwapOut) state.quickSwapOut = (r2.out && r2.out[0]) || r1.field[0] || null;
+  if(!state.quickSwapIn)  state.quickSwapIn  = (r2.inn && r2.inn[0]) || r1.bench[0] || null;
+
+  // veldchips
+  fieldBox.innerHTML = r1.field.map(id => {
+    const staged = (id === state.quickSwapOut) ? ' staged' : '';
+    return `
+      <div class="chip${staged}" data-id="${id}" data-where="field">
+        <div class="who">${nameBy(id)}</div>
+        <div class="act">
+          <button class="btn-move btn-to-bench" data-action="toBench">→ bank</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  // benchchips
+  benchBox.innerHTML = r1.bench.map(id => {
+    const staged = (id === state.quickSwapIn) ? ' staged' : '';
+    return `
+      <div class="chip${staged}" data-id="${id}" data-where="bench">
+        <div class="who">${nameBy(id)}</div>
+        <div class="act">
+          <button class="btn-move btn-to-field" data-action="toField">→ veld</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 
 /* ========== TIMER/PROGRESS/OVERLAY ========== */
 function fmt(ms){ const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000)); const m=Math.floor(t/60); const s=String(t%60).padStart(2,'0'); return `${m}:${s}`; }
@@ -566,23 +633,33 @@ document.getElementById('btnQuickRecalc').addEventListener('click', ()=>{
 });
 document.getElementById('btnQuickToLive').addEventListener('click', ()=>{ document.querySelector('.tab button[data-tab="live"]').click(); renderLive(); });
 function applyManualSwapForCurrentQuarter(){
-  const r1=state.schedule.find(r=>r.q===state.q && r.slot===1);
-  const r2=state.schedule.find(r=>r.q===state.q && r.slot===2);
-  if(!r1||!r2) return;
-  const outId=document.getElementById('manualOut').value;
-  const inId =document.getElementById('manualIn').value;
-  if(!outId||!inId||outId===inId) return;
-  const newField = r1.field.map(id=>id===outId?inId:id);
+  const {r1, r2} = currentSlots();
+  if(!r1 || !r2) return;
+
+  const outId = state.quickSwapOut;
+  const inId  = state.quickSwapIn;
+  if(!outId || !inId || outId === inId) return;
+
+  // Bouw slot-2 veld o.b.v. slot-1 en onze handmatige keuze
+  const newField = r1.field.map(id => id===outId ? inId : id);
   const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
   const newBench = all.filter(id=>!newField.includes(id));
-  const forcedS2 = { start:5,end:10, field:newField, bench:newBench, out:[outId], inn:[inId] };
+
+  // Forceer s2 van dit kwart, daarna herplan rest van de wedstrijd
+  const forcedS2 = { start:5, end:10, field:newField, bench:newBench, out:[outId], inn:[inId] };
   rebuildScheduleFromQuarter(state.q, forcedS2);
-  renderLive(); renderDist(); populateManualSwapUI();
+
+  // Reset staged keuze zodat UI netjes is voor een volgende wijziging
+  state.quickSwapOut = null;
+  state.quickSwapIn  = null;
+
+  // UI bijwerken
+  renderLive();
+  renderDist();
+  renderQuickSwapCols();
 }
 document.getElementById('btnApplyManualSwap').addEventListener('click', applyManualSwapForCurrentQuarter);
-document.getElementById('btnStart').addEventListener('click', start);
-document.getElementById('btnPause').addEventListener('click', pause);
-document.getElementById('btnDidSwap').addEventListener('click', hideSwap);
+
 
 /* INIT */
 load(); ensureDefaults(); recomputeAll(); renderSetup();
