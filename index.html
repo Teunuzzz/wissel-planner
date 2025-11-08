@@ -221,7 +221,7 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
     <div class="quick-col">
       <h4>Veld</h4>
       <div class="chips" id="quickFieldChips"></div>
-      <div class="note">Klik op <b>→ bank</b> bij degene die je <u>van het veld</u> wilt halen.</div>
+      <div class="note">Klik op <b>→ bank</b> bij degene die <u>van het veld</u> moet.</div>
     </div>
     <div class="quick-col">
       <h4>Bank</h4>
@@ -708,79 +708,133 @@ function showSwap(){
 function hideSwap(){ const ov=document.getElementById('swapOverlay'); if(ov) ov.style.display='none'; try{ navigator.vibrate && navigator.vibrate([60]); }catch(e){} }
 
 /* ---------- EVENTS ---------- */
-document.querySelectorAll('.tab button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active'));
+/* =====================  EVENTS (compact & robuust)  ===================== */
+
+// 1) Alle klik-acties via één gedelegeerde listener
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button, .btn-move'); // knoppen & chip-acties
+  if (!btn) return;
+
+  /* ---- Tabs ---- */
+  if (btn.matches('.tab button')) {
+    // Activeer tab
+    document.querySelectorAll('.tab button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
-    const id = btn.dataset.tab==='setup'?'tab-setup' : btn.dataset.tab==='live'?'tab-live' : btn.dataset.tab==='quick'?'tab-quick' : 'tab-dist';
-    document.getElementById(id)?.classList.remove('hidden');
-    if(id==='tab-setup') renderSetup();
-    if(id==='tab-live')  renderLive();
-    if(id==='tab-quick') renderQuick();
-    if(id==='tab-dist')  renderDist();
-  });
+    // Paneel tonen/verbergen
+    ['tab-setup','tab-live','tab-quick','tab-dist']
+      .forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    const showId =
+      btn.dataset.tab === 'setup' ? 'tab-setup' :
+      btn.dataset.tab === 'live'  ? 'tab-live'  :
+      btn.dataset.tab === 'quick' ? 'tab-quick' : 'tab-dist';
+    document.getElementById(showId)?.classList.remove('hidden');
+
+    // Render juiste view
+    if (showId === 'tab-setup') renderSetup();
+    if (showId === 'tab-live')  renderLive();
+    if (showId === 'tab-quick') renderQuick();
+    if (showId === 'tab-dist')  renderDist();
+    return;
+  }
+
+  /* ---- Timer & overlay ---- */
+  if (btn.id === 'btnStart') { start(); return; }
+  if (btn.id === 'btnPause') { pause(); return; }
+  if (btn.id === 'btnDidSwap') { hideSwap(); return; }
+
+  /* ---- Setup: spelers beheren ---- */
+  if (btn.id === 'btnAdd') {
+    state.players.push({ id: uid(), name: 'Nieuwe speler', pos: 'Aanvaller', present: true, benchCd: 0 });
+    save(); renderPlayersList();
+    return;
+  }
+  if (btn.id === 'btnReset') {
+    if (!confirm('Team resetten naar vaste 8 spelers?')) return;
+    seedDefaultPlayers();
+    recomputeAll();
+    renderLive();
+    document.querySelector('.tab button[data-tab="live"]')?.click();
+    return;
+  }
+  if (btn.id === 'btnSaveSetup') {
+    state.team        = (document.getElementById('teamName')?.value || 'Team').trim();
+    state.formation   = Number(document.getElementById('formation')?.value) || 5;
+    state.keepersMode = Number(document.getElementById('keepersMode')?.value) || 1;
+    readKeeperAssign('keepk');
+    recomputeAll();
+    renderLive(); renderDist();
+    document.querySelector('.tab button[data-tab="live"]')?.click();
+    return;
+  }
+
+  /* ---- Snelle wijzigingen ---- */
+  if (btn.id === 'btnQuickRecalc') {
+    const qf = document.getElementById('quickFormation');
+    if (qf) state.formation = Number(qf.value) || state.formation;
+    readKeeperAssign('quickk');
+    recomputeAll();
+    renderLive(); renderDist(); renderQuickSwapCols();
+    document.querySelector('.tab button[data-tab="live"]')?.click();
+    return;
+  }
+  if (btn.id === 'btnQuickToLive') {
+    document.querySelector('.tab button[data-tab="live"]')?.click();
+    renderLive();
+    return;
+  }
+
+  /* ---- Chips in Snelle wijzigingen (selecteer OUT/IN) ---- */
+  if (btn.classList.contains('btn-move')) {
+    const chip  = btn.closest('.chip');
+    if (!chip) return;
+    const id    = chip.getAttribute('data-id');
+    const where = chip.getAttribute('data-where');    // 'field' of 'bench'
+    const act   = btn.getAttribute('data-action');     // 'toBench' of 'toField'
+
+    if (where === 'field' && act === 'toBench') {
+      state.quickSwapOut = id; save(); renderQuickSwapCols();
+      return;
+    }
+    if (where === 'bench' && act === 'toField') {
+      state.quickSwapIn = id; save(); renderQuickSwapCols();
+      return;
+    }
+  }
+
+  /* ---- Handmatige wissel definitief maken ---- */
+  if (btn.id === 'btnApplyManualSwap') {
+    const { r1, r2 } = currentSlots();
+    if (!r1 || !r2) return;
+
+    const outId = state.quickSwapOut;
+    const inId  = state.quickSwapIn;
+    if (!outId || !inId || outId === inId) return;
+
+    // Bouw nieuw veld & bank voor slot-2 van huidig kwart
+    const newField = r1.field.map(id => id === outId ? inId : id);
+    const allIds   = presentPlayers().map(p => p.id).filter(id => id !== r1.keeper);
+    const newBench = allIds.filter(id => !newField.includes(id));
+    const forcedS2 = { start: 5, end: 10, field: newField, bench: newBench, out: [outId], inn: [inId] };
+
+    // Herplan vanaf huidig kwart; eerdere periodes blijven staan, tellen wel mee
+    rebuildScheduleFromQuarter(state.q, forcedS2);
+
+    // (Optioneel) staging resetten:
+    // state.quickSwapOut = null; state.quickSwapIn = null;
+
+    renderLive(); renderDist(); renderQuickSwapCols();
+    return;
+  }
 });
 
-document.getElementById('btnAdd')?.addEventListener('click', ()=>{
-  state.players.push({ id:uid(), name:'Nieuwe speler', pos:'Aanvaller', present:true, benchCd:0 });
-  save(); renderPlayersList();
+// 2) Dropdown-wijzigingen die UI moeten updaten
+document.addEventListener('change', (e) => {
+  if (e.target?.id === 'keepersMode') {
+    state.keepersMode = Number(e.target.value) || 1;
+    keeperAssignUI('keeperAssignRow', 'keepk');
+    save();
+  }
 });
-document.getElementById('btnReset')?.addEventListener('click', ()=>{
-  if(!confirm('Team resetten naar vaste 8 spelers?')) return;
-  state.players = DEFAULT_ORDER.map((n,i)=>({ id:uid(), name:n, pos:POS[i%3], present:true, benchCd:0 }));
-  const ps=state.players.map(p=>p.id);
-  state.keeperByQuarter=[ps[0],ps[1]||ps[0],ps[2]||ps[0],ps[3]||ps[0]];
-  recomputeAll(); document.querySelector('.tab button[data-tab="live"]')?.click(); renderLive();
-});
-document.getElementById('keepersMode')?.addEventListener('change', ()=>{
-  state.keepersMode = Number(document.getElementById('keepersMode').value)||1;
-  keeperAssignUI('keeperAssignRow','keepk'); save();
-});
-document.getElementById('btnSaveSetup')?.addEventListener('click', ()=>{
-  state.team = document.getElementById('teamName').value.trim() || 'Team';
-  state.formation = Number(document.getElementById('formation').value) || 5;
-  state.keepersMode = Number(document.getElementById('keepersMode').value) || 1;
-  readKeeperAssign('keepk'); recomputeAll(); renderLive(); renderDist();
-  document.querySelector('.tab button[data-tab="live"]')?.click();
-});
-document.getElementById('btnQuickRecalc')?.addEventListener('click', ()=>{
-  const qf=document.getElementById('quickFormation'); if(qf) state.formation = Number(qf.value) || state.formation;
-  readKeeperAssign('quickk'); recomputeAll(); renderLive(); renderDist(); renderQuick();
-  document.querySelector('.tab button[data-tab="live"]')?.click();
-});
-document.getElementById('btnQuickToLive')?.addEventListener('click', ()=>{
-  document.querySelector('.tab button[data-tab="live"]')?.click(); renderLive();
-});
-
-/* Pas wissel aan (hele wedstrijd herverdelen vanaf huidig kwart) */
-function applyManualSwapForCurrentQuarter(){
-  const { r1 } = currentSlots();
-  if(!r1) return;
-
-  const outId = state.quickSwapOut;
-  const inId  = state.quickSwapIn;
-  if(!outId || !inId || outId===inId) return;
-
-  const newField = r1.field.map(id => id===outId ? inId : id);
-  const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
-  const newBench = all.filter(id=>!newField.includes(id));
-
-  const forcedS2 = { start:5, end:10, field:newField, bench:newBench, out:[outId], inn:[inId] };
-
-  rebuildScheduleFromQuarter(state.q, forcedS2);
-
-  // selectie behouden (niet naar “bovenste” springen); pas resetten als je wilt
-  // state.quickSwapOut = null; state.quickSwapIn = null;
-
-  renderLive(); renderDist(); renderQuickSwapCols();
-}
-document.getElementById('btnApplyManualSwap')?.addEventListener('click', applyManualSwapForCurrentQuarter);
-
-/* Timer knoppen + overlay */
-document.getElementById('btnStart')?.addEventListener('click', start);
-document.getElementById('btnPause')?.addEventListener('click', pause);
-document.getElementById('btnDidSwap')?.addEventListener('click', hideSwap);
 
 /* ---------- INIT ---------- */
 load(); ensureDefaults(); recomputeAll(); renderSetup(); updateTimerUI();
