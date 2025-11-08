@@ -265,13 +265,22 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 </div>
 <!-- SCRIPT -->
 <script>
-/* ========= Wisselplanner v16 (stabiel) ========= */
+/* =========================================================
+   Wisselplanner – De Esch (v16)
+   - Fix: geen nested <script>, geen syntax errors
+   - Fix: helperfuncties aanwezig (rebuildScheduleFromQuarter)
+   - Fix: snelle wissel werkt; selectie blijft staan
+   - UX: klikken op chip selecteert ook (niet alleen knopje)
+   - Init: default spelers staan er direct
+========================================================= */
 
-const storeKey = 'wisselplanner.v16';                  // nieuw key om oude, corrupte opslag te omzeilen
+const storeKey = 'wisselplanner.v16';   // bump om oude (kapotte) state te negeren
 const POS = ['Aanvaller','Middenvelder','Verdediger'];
 const DEFAULT_ORDER = ['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
 
 let state = {
+  quickSwapOut: null,      // id veld -> naar bank
+  quickSwapIn:  null,      // id bank -> naar veld
   team: 'De Esch O9',
   formation: 5,
   players: [],
@@ -282,71 +291,36 @@ let state = {
   plannedMinutes: {},
   running: false,
   elapsedMs: 0,
-  quarterMs: 10 * 60 * 1000,
-  swapAtMs: 5 * 60 * 1000,
-  swappedThisQuarter: false,
-  // snelle wijziging (staging)
-  quickSwapOut: null,
-  quickSwapIn:  null,
+  quarterMs: 10*60*1000,
+  swapAtMs: 5*60*1000,
+  swappedThisQuarter: false
 };
 
-/* ---------- Opslag ---------- */
+/* ---------- STORAGE ---------- */
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function save(){ try{ localStorage.setItem(storeKey, JSON.stringify(state)); }catch(e){} }
-function load(){
-  try{
-    const raw = localStorage.getItem(storeKey);
-    if(!raw) return;
-    const obj = JSON.parse(raw);
-    if(!obj || typeof obj !== 'object') return;
-    state = { ...state, ...obj };
-  }catch(e){}
-}
+function load(){ try{ const raw = localStorage.getItem(storeKey); if(raw) state = JSON.parse(raw); }catch(e){} }
 
-/* ---------- Validatie/Defaults ---------- */
-function seedDefaultPlayers(){
-  state.players = DEFAULT_ORDER.map((n,i)=>({
-    id: uid(), name: n, pos: POS[i%3], present: true, benchCd: 0
-  }));
-  const ps = state.players.map(p=>p.id);
-  state.keeperByQuarter = [ps[0], ps[1]||ps[0], ps[2]||ps[0], ps[3]||ps[0]];
-}
+/* ---------- DEFAULTS ---------- */
 function ensureDefaults(){
-  // spelers
   if(!Array.isArray(state.players) || state.players.length === 0){
-    seedDefaultPlayers();
-  }else{
-    // herstel ontbrekende velden/lege namen/ids
-    let dirty = false;
-    state.players = state.players.map((p,i)=>{
-      if(!p || typeof p !== 'object') { dirty = true; return {id:uid(), name:DEFAULT_ORDER[i]||('Speler '+(i+1)), pos:POS[i%3], present:true, benchCd:0}; }
-      if(!p.id){ p.id = uid(); dirty = true; }
-      if(!p.name){ p.name = DEFAULT_ORDER[i]||('Speler '+(i+1)); dirty = true; }
-      if(!p.pos){ p.pos = POS[i%3]; dirty = true; }
-      if(typeof p.present!=='boolean'){ p.present = true; dirty = true; }
-      if(typeof p.benchCd!=='number'){ p.benchCd = 0; dirty = true; }
-      return p;
-    });
-    if(dirty) save();
+    state.players = DEFAULT_ORDER.map((n,i)=>({ id:uid(), name:n, pos:POS[i%3], present:true, benchCd:0 }));
   }
-  // keepers per kwart
   if(!Array.isArray(state.keeperByQuarter) || state.keeperByQuarter.length !== 4){
     const ps = state.players.map(p=>p.id);
     state.keeperByQuarter = [ps[0]||null, ps[1]||ps[0]||null, ps[2]||ps[0]||null, ps[3]||ps[0]||null];
   }
   if(!state.q) state.q = 1;
 }
-
-/* ---------- Helpers ---------- */
 function presentPlayers(){ return state.players.filter(p=>p.present); }
 function playerBy(id){ return state.players.find(p=>p.id===id); }
-function nameBy(id){ const p=playerBy(id); return p? p.name : '—'; }
+function nameBy(id){ const p = playerBy(id); return p ? p.name : '—'; }
 function rankIndex(id){ return state.players.findIndex(p=>p.id===id); }
 function keeperFor(q){ return state.keeperByQuarter[q-1]; }
 
-/* Bank-kwaliteit: top en top-2 mogen niet samen op bank (verschil <3 rangen) */
+/* ---------- BANK-kwaliteitsregel ---------- */
 function violatesQualityGap(arr){
-  if(!arr || arr.length<2) return false;
+  if(!arr || arr.length < 2) return false;
   for(let i=0;i<arr.length;i++){
     for(let j=i+1;j<arr.length;j++){
       if(Math.abs(rankIndex(arr[i]) - rankIndex(arr[j])) < 3) return true;
@@ -355,83 +329,78 @@ function violatesQualityGap(arr){
   return false;
 }
 
-/* ---------- Keeper UI (setup/quick) ---------- */
+/* ---------- KEEPER UI ---------- */
 function keeperAssignUI(containerId,prefix){
   const row = document.getElementById(containerId);
   if(!row) return;
   row.innerHTML = '';
   const ps = presentPlayers();
   const opts = ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  if(state.keepersMode===1){
-    row.innerHTML = `<select id="${prefix}-all">${opts}</select>`;
-    const el = document.getElementById(`${prefix}-all`);
+  if(state.keepersMode === 1){
+    const id=`${prefix}-all`;
+    row.innerHTML = `<select id="${id}">${opts}</select>`;
+    const el = document.getElementById(id);
     if(el) el.value = state.keeperByQuarter[0] || ps[0]?.id || '';
-  }else if(state.keepersMode===2){
+  }else if(state.keepersMode === 2){
     row.innerHTML = `
       <div class="grid2" style="width:100%">
         <div><label>1e helft</label><select id="${prefix}-h1">${opts}</select></div>
         <div><label>2e helft</label><select id="${prefix}-h2">${opts}</select></div>
       </div>`;
-    const a=document.getElementById(`${prefix}-h1`), b=document.getElementById(`${prefix}-h2`);
+    const a = document.getElementById(`${prefix}-h1`);
+    const b = document.getElementById(`${prefix}-h2`);
     if(a) a.value = state.keeperByQuarter[0] || ps[0]?.id || '';
     if(b) b.value = state.keeperByQuarter[2] || ps[1]?.id || ps[0]?.id || '';
   }else{
     const ids=[`${prefix}-q1`,`${prefix}-q2`,`${prefix}-q3`,`${prefix}-q4`];
-    row.innerHTML = `<div class="grid2" style="width:100%">
-      ${ids.map((id,i)=>`<div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>`).join('')}
-    </div>`;
-    ids.forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.value = state.keeperByQuarter[i] || ps[i]?.id || ps[0]?.id || ''; });
+    row.innerHTML = `
+      <div class="grid2" style="width:100%">
+        ${ids.map((id,i)=>`<div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>`).join('')}
+      </div>`;
+    ids.forEach((id,i)=>{ const el = document.getElementById(id); if(el) el.value = state.keeperByQuarter[i] || ps[i]?.id || ps[0]?.id || ''; });
   }
 }
 function readKeeperAssign(prefix){
   const ps = presentPlayers();
-  const val = id => { const el=document.getElementById(id); return el? el.value : (ps[0]?.id||null); };
-  if(state.keepersMode===1){
+  const val = id => { const el = document.getElementById(id); return el ? el.value : (ps[0]?.id||null); };
+  if(state.keepersMode === 1){
     const k = val(`${prefix}-all`); state.keeperByQuarter = [k,k,k,k];
-  }else if(state.keepersMode===2){
+  }else if(state.keepersMode === 2){
     const a = val(`${prefix}-h1`), b = val(`${prefix}-h2`); state.keeperByQuarter = [a,a,b,b];
   }else{
     state.keeperByQuarter = [val(`${prefix}-q1`),val(`${prefix}-q2`),val(`${prefix}-q3`),val(`${prefix}-q4`)];
   }
 }
 
-/* ---------- Planner ---------- */
+/* ---------- PLANNER ---------- */
 function applySlotMinutes(r){
   [...r.field, r.keeper].forEach(id => { state.plannedMinutes[id] = (state.plannedMinutes[id]||0) + 5; });
-  presentPlayers().forEach(p=>{
-    if(p.id===r.keeper) return;
-    p.benchCd = r.bench.includes(p.id) ? 1 : 0;
-  });
+  presentPlayers().forEach(p => { if(p.id===r.keeper) return; p.benchCd = r.bench.includes(p.id) ? 1 : 0; });
 }
 
-function buildSlot(q, slot, k, prevField){
+function buildSlot(q,slot,k,prevField){
   const all = presentPlayers().map(p=>p.id).filter(id=>id!==k);
-  const mustPlay = all.filter(id=>playerBy(id).benchCd>0);
+  const mustPlay = all.filter(id => playerBy(id).benchCd > 0);
   let field = mustPlay.slice();
 
   const need = Math.max(0, state.formation - field.length);
-  const add = all
-    .filter(id=>!field.includes(id))
+  const add = all.filter(id=>!field.includes(id))
     .sort((a,b)=>{
-      const da = (state.plannedMinutes[a]||0) - (state.plannedMinutes[b]||0);
-      if(da!==0) return da;
-      return rankIndex(a) - rankIndex(b);
-    })
-    .slice(0,need);
+      const da=(state.plannedMinutes[a]||0)-(state.plannedMinutes[b]||0);
+      return da!==0 ? da : rankIndex(a)-rankIndex(b);
+    }).slice(0,need);
   field = field.concat(add);
 
-  let bench = all.filter(id=>!field.includes(id));
+  let bench = all.filter(id => !field.includes(id));
 
-  // quality-gap afdwingen
   if(violatesQualityGap(bench)){
-    const canSwap = field.filter(id=>!mustPlay.includes(id))
+    const candidates = field.filter(id=>!mustPlay.includes(id))
       .sort((a,b)=>{
         const da=(state.plannedMinutes[b]||0)-(state.plannedMinutes[a]||0);
-        if(da!==0) return da;
-        return rankIndex(b)-rankIndex(a);
+        return da!==0 ? da : rankIndex(b)-rankIndex(a);
       });
     outer: for(const bId of bench.slice()){
-      for(const fId of canSwap){
+      for(const fId of candidates){
         const nf = field.map(x=>x===fId?bId:x);
         const nb = bench.map(x=>x===bId?fId:x);
         if(!violatesQualityGap(nb)){ field=nf; bench=nb; break outer; }
@@ -440,27 +409,14 @@ function buildSlot(q, slot, k, prevField){
   }
 
   let out=[], inn=[];
-  if(prevField){
-    out = prevField.filter(id=>!field.includes(id));
-    inn = field.filter(id=>!prevField.includes(id));
-  }
+  if(prevField){ out = prevField.filter(id=>!field.includes(id)); inn = field.filter(id=>!prevField.includes(id)); }
 
-  return {
-    q, slot,
-    start: (slot===1?0:5),
-    end:   (slot===1?5:10),
-    keeper: k,
-    field: field.slice(),
-    bench: bench.slice(),
-    out, inn
-  };
+  return { q, slot, start:(slot===1?0:5), end:(slot===1?5:10), keeper:k, field:field.slice(), bench:bench.slice(), out, inn };
 }
 
 function recomputeAll(){
-  state.schedule = [];
-  state.plannedMinutes = {};
-  state.players.forEach(p=>{ if(typeof p.benchCd!=='number') p.benchCd=0; state.plannedMinutes[p.id]=0; });
-
+  state.schedule = []; state.plannedMinutes = {};
+  state.players.forEach(p=>{ p.benchCd = p.benchCd||0; state.plannedMinutes[p.id]=0; });
   let prevField = null;
   for(let q=1;q<=4;q++){
     const k = keeperFor(q);
@@ -473,25 +429,20 @@ function recomputeAll(){
   save();
 }
 
-/* Minuten/cooldowns herberekenen tot en met index (inclusief) */
+/* Minuten/cooldowns t/m index herrekenen (voor herstartpunt) */
 function recomputeMinutesUpToIndex(lastIdx){
   state.plannedMinutes = {};
   state.players.forEach(p=> state.plannedMinutes[p.id]=0);
   presentPlayers().forEach(p=> p.benchCd = 0);
-  for(let i=0;i<=lastIdx;i++){
-    applySlotMinutes(state.schedule[i]);
-  }
+  for(let i=0;i<=lastIdx;i++){ applySlotMinutes(state.schedule[i]); }
 }
 
-/* Schema herbouwen vanaf een start-kwart; s2 van dat kwart kan worden geforceerd */
+/* Schema opnieuw opbouwen vanaf kwart, met optionele geforceerde s2 */
 function rebuildScheduleFromQuarter(startQ, forcedS2){
-  const idxS1 = (startQ-1)*2;
-  const idxS2 = idxS1 + 1;
+  const idxS1=(startQ-1)*2, idxS2=idxS1+1;
 
-  // 1) Herstel t/m vòòr startQ
-  recomputeMinutesUpToIndex(idxS1 - 1);
+  recomputeMinutesUpToIndex(idxS1-1);
 
-  // 2) s1 vasthouden/nieuw bouwen
   const kStart = keeperFor(startQ);
   let s1 = state.schedule[idxS1];
   if(!s1 || s1.q!==startQ || s1.slot!==1){
@@ -500,29 +451,88 @@ function rebuildScheduleFromQuarter(startQ, forcedS2){
   }
   state.schedule[idxS1] = s1; applySlotMinutes(s1);
 
-  // 3) s2 geforceerd of opnieuw bouwen
-  let s2 = forcedS2 ? { ...forcedS2, q:startQ, slot:2, keeper:kStart } : buildSlot(startQ,2,kStart,s1.field);
+  let s2 = forcedS2 ? { ...forcedS2, q:startQ, slot:2, keeper:kStart }
+                    : buildSlot(startQ,2,kStart,s1.field);
   state.schedule[idxS2] = s2; applySlotMinutes(s2);
 
-  // 4) Rest eerlijk herplannen
   let prevField = s2.field.slice();
-  for(let q=startQ+1;q<=4;q++){
+  for(let q=startQ+1; q<=4; q++){
     const k = keeperFor(q);
     const i1=(q-1)*2, i2=i1+1;
-    const ns1 = buildSlot(q,1,k,prevField); state.schedule[i1]=ns1; applySlotMinutes(ns1);
-    const ns2 = buildSlot(q,2,k,ns1.field);  state.schedule[i2]=ns2; applySlotMinutes(ns2);
+    const ns1=buildSlot(q,1,k,prevField); state.schedule[i1]=ns1; applySlotMinutes(ns1);
+    const ns2=buildSlot(q,2,k,ns1.field); state.schedule[i2]=ns2; applySlotMinutes(ns2);
     prevField = ns2.field.slice();
   }
   save();
 }
 
-/* ---------- UI Renders ---------- */
+/* ---------- DRAG SORT ---------- */
+function makeSortable(container){
+  let dragged=null, placeholder=null;
+
+  const onMove=(e)=>{
+    if(!dragged) return; e.preventDefault();
+    const y = (e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0);
+    const items=[...container.querySelectorAll('.player')].filter(el=>el!==dragged);
+    let target=null;
+    for(const el of items){
+      const r=el.getBoundingClientRect();
+      if(y>r.top && y<r.bottom){ target=el; break; }
+    }
+    if(target && placeholder){
+      const r=target.getBoundingClientRect();
+      if(y<r.top + r.height/2) container.insertBefore(placeholder, target);
+      else container.insertBefore(placeholder, target.nextSibling);
+    }
+  };
+
+  const onUp=()=>{
+    if(!dragged) return;
+    dragged.classList.remove('dragging');
+    if(placeholder && placeholder.parentNode){
+      placeholder.parentNode.insertBefore(dragged, placeholder);
+      placeholder.remove();
+    }
+    placeholder=null;
+
+    const ids=[...container.querySelectorAll('.player')].map(el=>el.dataset.id);
+    state.players = ids.map(id=>state.players.find(p=>p.id===id));
+    save();
+
+    window.removeEventListener('pointermove', onMove, {passive:false});
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    dragged=null;
+  };
+
+  container.querySelectorAll('.player').forEach(el=>{
+    const handle = el.querySelector('.drag') || el;
+    handle.addEventListener('pointerdown', (e)=>{
+      dragged=el; dragged.classList.add('dragging');
+      placeholder=document.createElement('div'); placeholder.className='placeholder';
+      placeholder.style.height = el.getBoundingClientRect().height + 'px';
+      container.insertBefore(placeholder, el.nextSibling);
+      e.preventDefault();
+      window.addEventListener('pointermove', onMove, {passive:false});
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    }, {passive:false});
+  });
+}
+
+function currentSlots(){
+  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
+  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
+  return { r1, r2 };
+}
+
+/* ---------- RENDER ---------- */
 function renderPlayersList(){
-  const list = document.getElementById('playerList'); if(!list) return;
-  list.innerHTML = '';
+  const list = document.getElementById('playerList');
+  if(!list) return;
+  list.innerHTML='';
   state.players.forEach(p=>{
-    const el = document.createElement('div');
-    el.className = 'player'; el.dataset.id = p.id;
+    const el=document.createElement('div'); el.className='player'; el.dataset.id=p.id;
     el.innerHTML = `
       <div class="drag">☰</div>
       <div class="name" contenteditable="true">${p.name}</div>
@@ -538,72 +548,24 @@ function renderPlayersList(){
   makeSortable(list);
 }
 
-function makeSortable(container){
-  let dragged=null, placeholder=null;
-  const onMove=(e)=>{
-    if(!dragged) return; e.preventDefault();
-    const y=(e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0);
-    const items=[...container.querySelectorAll('.player')].filter(el=>el!==dragged);
-    let target=null;
-    for(const el of items){ const r=el.getBoundingClientRect(); if(y>r.top && y<r.bottom){ target=el; break; } }
-    if(target && placeholder){
-      const r=target.getBoundingClientRect();
-      if(y<r.top+r.height/2) container.insertBefore(placeholder,target);
-      else container.insertBefore(placeholder,target.nextSibling);
-    }
-  };
-  const onUp=()=>{
-    if(!dragged) return;
-    dragged.classList.remove('dragging');
-    if(placeholder && placeholder.parentNode){ placeholder.parentNode.insertBefore(dragged,placeholder); placeholder.remove(); }
-    placeholder=null;
-    const ids=[...container.querySelectorAll('.player')].map(el=>el.dataset.id);
-    state.players = ids.map(id=> state.players.find(p=>p.id===id));
-    save();
-    window.removeEventListener('pointermove', onMove, {passive:false});
-    window.removeEventListener('pointerup', onUp);
-    window.removeEventListener('pointercancel', onUp);
-    dragged=null;
-  };
-  container.querySelectorAll('.player').forEach(el=>{
-    const handle = el.querySelector('.drag') || el;
-    handle.addEventListener('pointerdown',(e)=>{
-      dragged=el; dragged.classList.add('dragging');
-      placeholder=document.createElement('div'); placeholder.className='placeholder';
-      placeholder.style.height = el.getBoundingClientRect().height+'px';
-      container.insertBefore(placeholder, el.nextSibling);
-      e.preventDefault();
-      window.addEventListener('pointermove', onMove, {passive:false});
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    },{passive:false});
-  });
-}
-
 function renderSetup(){
-  const tn = document.getElementById('teamName');
-  const fm = document.getElementById('formation');
-  const km = document.getElementById('keepersMode');
-  if(tn) tn.value = state.team;
-  if(fm) fm.value = String(state.formation);
-  if(km) km.value = String(state.keepersMode);
+  const tn=document.getElementById('teamName'); if(tn) tn.value=state.team;
+  const fm=document.getElementById('formation'); if(fm) fm.value=String(state.formation);
+  const km=document.getElementById('keepersMode'); if(km) km.value=String(state.keepersMode);
   keeperAssignUI('keeperAssignRow','keepk');
   renderPlayersList();
 }
 
 function renderLive(){
-  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
-  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
-  const el = id => document.getElementById(id);
+  const lbl=document.getElementById('lblQuarter'); if(lbl) lbl.textContent = `Kwart ${state.q} / 4`;
+  const { r1, r2 } = currentSlots();
+  const lk=document.getElementById('liveKeeper'); if(lk) lk.textContent = nameBy(r1?.keeper)||'—';
+  const lf=document.getElementById('liveField');  if(lf) lf.textContent = (r1?.field||[]).map(nameBy).join(', ')||'—';
+  const lb=document.getElementById('liveBench');  if(lb) lb.textContent = (r1?.bench||[]).map(nameBy).join(', ')||'—';
+  const lo=document.getElementById('liveSwapOut'); if(lo) lo.textContent = (r2?.out||[]).map(nameBy).join(', ')||'—';
+  const li=document.getElementById('liveSwapIn');  if(li) li.textContent = (r2?.inn||[]).map(nameBy).join(', ')||'—';
 
-  if(el('lblQuarter')) el('lblQuarter').textContent = `Kwart ${state.q} / 4`;
-  if(el('liveKeeper')) el('liveKeeper').textContent = nameBy(r1?.keeper)||'—';
-  if(el('liveField'))  el('liveField').textContent  = (r1?.field||[]).map(nameBy).join(', ')||'—';
-  if(el('liveBench'))  el('liveBench').textContent  = (r1?.bench||[]).map(nameBy).join(', ')||'—';
-  if(el('liveSwapOut')) el('liveSwapOut').textContent = (r2?.out||[]).map(nameBy).join(', ')||'—';
-  if(el('liveSwapIn'))  el('liveSwapIn').textContent  = (r2?.inn||[]).map(nameBy).join(', ')||'—';
-
-  const tb=document.querySelector('#scheduleTable tbody');
+  const tb = document.querySelector('#scheduleTable tbody'); 
   if(tb){
     tb.innerHTML='';
     [r1,r2].filter(Boolean).forEach(r=>{
@@ -616,26 +578,28 @@ function renderLive(){
 }
 
 function renderQuick(){
-  const cont=document.getElementById('quickActive'); if(cont){ cont.innerHTML='';
+  const cont=document.getElementById('quickActive');
+  if(cont){
+    cont.innerHTML='';
     state.players.forEach(p=>{
       const line=document.createElement('div'); line.className='player';
-      line.innerHTML = `<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`;
+      line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`;
       line.querySelector('input').addEventListener('change',e=>{ p.present=e.target.checked; save(); });
       cont.appendChild(line);
     });
   }
-  const qf=document.getElementById('quickFormation');
-  if(qf){ qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation); }
+  const qf=document.getElementById('quickFormation'); if(qf){ qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation); }
   keeperAssignUI('quickKeeperAssign','quickk');
   renderQuickSwapCols();
 }
 
 function renderDist(){
-  const body=document.querySelector('#distSwaps tbody'); if(body){
+  const body=document.querySelector('#distSwaps tbody');
+  if(body){
     body.innerHTML='';
     state.schedule.forEach(r=>{
       const tr=document.createElement('tr');
-      tr.innerHTML = `<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${nameBy(r.keeper)}</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`;
+      tr.innerHTML=`<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${nameBy(r.keeper)}</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`;
       body.appendChild(tr);
     });
   }
@@ -653,63 +617,62 @@ function renderDist(){
   }
 }
 
-/* ---------- Quick-wissel kolommen ---------- */
-function currentSlots(){
-  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
-  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
-  return { r1, r2 };
-}
+/* ---------- Snelle wissel – chips ---------- */
 function renderQuickSwapCols(){
   const { r1, r2 } = currentSlots();
-  const fieldBox = document.getElementById('quickFieldChips');
-  const benchBox = document.getElementById('quickBenchChips');
+  const fieldBox=document.getElementById('quickFieldChips');
+  const benchBox=document.getElementById('quickBenchChips');
   if(!r1 || !r2 || !fieldBox || !benchBox) return;
 
-  if(!r1.field.includes(state.quickSwapOut)) state.quickSwapOut = r1.field[0] || null;
-  if(!r1.bench.includes(state.quickSwapIn)) state.quickSwapIn = r1.bench[0] || null;
+  // Default alleen als niets geselecteerd is:
+  if(state.quickSwapOut === null) state.quickSwapOut = r1.field[0] || null;
+  if(state.quickSwapIn  === null) state.quickSwapIn  = r1.bench[0] || null;
 
-  fieldBox.innerHTML = r1.field.map(id=>`
-    <div class="chip${id===state.quickSwapOut?' staged':''}" data-id="${id}" data-where="field">
-      <div class="who">${nameBy(id)}</div>
-      <div class="act"><button class="btn-move btn-to-bench" data-action="toBench">→ bank</button></div>
-    </div>`).join('');
+  fieldBox.innerHTML = r1.field.map(id=>{
+    const staged = (id===state.quickSwapOut) ? ' staged' : '';
+    return `<div class="chip${staged}" data-id="${id}" data-where="field">
+              <div class="who">${nameBy(id)}</div>
+              <div class="act"><button class="btn-move btn-to-bench" data-action="toBench">→ bank</button></div>
+            </div>`;
+  }).join('');
 
-  benchBox.innerHTML = r1.bench.map(id=>`
-    <div class="chip${id===state.quickSwapIn?' staged':''}" data-id="${id}" data-where="bench">
-      <div class="who">${nameBy(id)}</div>
-      <div class="act"><button class="btn-move btn-to-field" data-action="toField">→ veld</button></div>
-    </div>`).join('');
+  benchBox.innerHTML = r1.bench.map(id=>{
+    const staged = (id===state.quickSwapIn) ? ' staged' : '';
+    return `<div class="chip${staged}" data-id="${id}" data-where="bench">
+              <div class="who">${nameBy(id)}</div>
+              <div class="act"><button class="btn-move btn-to-field" data-action="toField">→ veld</button></div>
+            </div>`;
+  }).join('');
 }
 
-/* Gedelegeerde handler één keer binden */
-document.addEventListener('click',(e)=>{
-  const btn = e.target.closest('.btn-move');
-  if(!btn) return;
-  const chip = e.target.closest('.chip'); if(!chip) return;
-  const id   = chip.getAttribute('data-id');
-  const where= chip.getAttribute('data-where');
-  const act  = btn.getAttribute('data-action');
-  if(!id || !where || !act) return;
+/* Eén handler: klik op chip OF op knopje werkt */
+(function bindQuickSwapHandlers(){
+  const container = document.getElementById('quickSwapCols');
+  if(!container) return;
 
-  if(where==='field' && act==='toBench'){ state.quickSwapOut = id; save(); renderQuickSwapCols(); }
-  if(where==='bench' && act==='toField'){ state.quickSwapIn  = id; save(); renderQuickSwapCols(); }
-});
+  container.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    const id    = chip.getAttribute('data-id');
+    const where = chip.getAttribute('data-where');
+    const btn   = e.target.closest('.btn-move');
+    const act   = btn ? btn.getAttribute('data-action') : (where==='field' ? 'toBench' : 'toField');
 
-/* ---------- Timer / Progress ---------- */
-function fmt(ms){
-  const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000));
-  const m=Math.floor(t/60), s=String(t%60).padStart(2,'0');
-  return `${m}:${s}`;
-}
+    if(where==='field' && act==='toBench'){ state.quickSwapOut = id; save(); renderQuickSwapCols(); }
+    if(where==='bench' && act==='toField'){ state.quickSwapIn  = id; save(); renderQuickSwapCols(); }
+  });
+})();
+
+/* ---------- TIMER + PROGRESS ---------- */
+function fmt(ms){ const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000)); const m=Math.floor(t/60); const s=String(t%60).padStart(2,'0'); return `${m}:${s}`; }
 function updateTimerUI(){
-  const clock=document.getElementById('clock'); if(clock) clock.textContent=fmt(state.elapsedMs);
-  const quarterMs=state.quarterMs, totalMs=4*quarterMs;
-  const totalElapsed=(state.q-1)*quarterMs+state.elapsedMs;
-  const fill=document.getElementById('matchFill'); if(fill) fill.style.width=Math.min(100,(totalElapsed/totalMs)*100)+'%';
+  const clock=document.getElementById('clock'); if(clock) clock.textContent = fmt(state.elapsedMs);
+  const quarterMs=state.quarterMs, totalMs=4*quarterMs, totalElapsed=(state.q-1)*quarterMs + state.elapsedMs;
+  const fill=document.getElementById('matchFill'); if(fill) fill.style.width = Math.min(100,(totalElapsed/totalMs)*100)+'%';
   const pctInQuarter=Math.min(100,(state.elapsedMs/quarterMs)*100);
-  const marker=document.getElementById('quarterMarker'); if(marker) marker.style.left=((state.q-1)*25 + pctInQuarter*0.25)+'%';
-  const lblQ=document.getElementById('lblQuarter'); if(lblQ) lblQ.textContent = `Kwart ${state.q} / 4`;
+  const marker=document.getElementById('quarterMarker'); if(marker) marker.style.left = ((state.q-1)*25 + pctInQuarter*0.25)+'%';
 }
+
 let tick=null;
 function start(){
   if(state.running) return;
@@ -722,110 +685,105 @@ function start(){
       showSwap(); state.swappedThisQuarter = true;
     }
     if(state.elapsedMs >= state.quarterMs){
-      state.elapsedMs = state.quarterMs;
-      pause();
+      state.elapsedMs = state.quarterMs; pause();
       if(state.q < 4){
-        state.q += 1;
-        state.elapsedMs = 0;
-        state.swappedThisQuarter = false;
+        state.q += 1; state.elapsedMs = 0; state.swappedThisQuarter=false;
         renderLive();
       }
-      save();
-      return;
+      save(); return;
     }
     updateTimerUI();
   }, 200);
 }
-function pause(){
-  state.running = false;
-  if(tick){ clearInterval(tick); tick=null; }
-  save();
-}
+function pause(){ state.running=false; if(tick){clearInterval(tick); tick=null;} save(); }
 function showSwap(){
   const r = state.schedule.find(x=>x.q===state.q && x.slot===2);
   const out=(r?.out||[]).map(nameBy), inn=(r?.inn||[]).map(nameBy);
-  const el = id=>document.getElementById(id);
-  if(el('swapOut')) el('swapOut').innerHTML = out.length?out.map(n=>`<div class="namechip">${n}</div>`).join(''):'<div class="namechip">—</div>';
-  if(el('swapIn'))  el('swapIn').innerHTML  = inn.length?inn.map(n=>`<div class="namechip">${n}</div>`).join('') :'<div class="namechip">—</div>';
-  if(el('swapOverlay')) el('swapOverlay').style.display='flex';
+  const so=document.getElementById('swapOut'); const si=document.getElementById('swapIn');
+  if(so) so.innerHTML = out.length?out.map(n=>`<div class="namechip">${n}</div>`).join(''):'<div class="namechip">—</div>';
+  if(si) si.innerHTML = inn.length?inn.map(n=>`<div class="namechip">${n}</div>`).join(''):'<div class="namechip">—</div>';
+  const ov=document.getElementById('swapOverlay'); if(ov) ov.style.display='flex';
   try{ navigator.vibrate && navigator.vibrate([120,80,120]); }catch(e){}
 }
-function hideSwap(){ const el=document.getElementById('swapOverlay'); if(el) el.style.display='none'; try{ navigator.vibrate && navigator.vibrate([60]); }catch(e){} }
+function hideSwap(){ const ov=document.getElementById('swapOverlay'); if(ov) ov.style.display='none'; try{ navigator.vibrate && navigator.vibrate([60]); }catch(e){} }
 
-/* ---------- Events ---------- */
-document.addEventListener('click',(e)=>{
-  if(e.target.id==='btnStart') start();
-  if(e.target.id==='btnPause') pause();
-  if(e.target.id==='btnDidSwap') hideSwap();
-
-  if(e.target.matches('.tab button')){
+/* ---------- EVENTS ---------- */
+document.querySelectorAll('.tab button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active'));
-    e.target.classList.add('active');
+    btn.classList.add('active');
     ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
-    const id = e.target.dataset.tab==='setup'?'tab-setup'
-             : e.target.dataset.tab==='live' ? 'tab-live'
-             : e.target.dataset.tab==='quick'? 'tab-quick':'tab-dist';
+    const id = btn.dataset.tab==='setup'?'tab-setup' : btn.dataset.tab==='live'?'tab-live' : btn.dataset.tab==='quick'?'tab-quick' : 'tab-dist';
     document.getElementById(id)?.classList.remove('hidden');
     if(id==='tab-setup') renderSetup();
     if(id==='tab-live')  renderLive();
     if(id==='tab-quick') renderQuick();
     if(id==='tab-dist')  renderDist();
-  }
-
-  if(e.target.id==='btnAdd'){
-    state.players.push({ id:uid(), name:'Nieuwe speler', pos:'Aanvaller', present:true, benchCd:0 });
-    save(); renderPlayersList();
-  }
-  if(e.target.id==='btnReset'){
-    if(!confirm('Team resetten naar vaste 8 spelers?')) return;
-    seedDefaultPlayers(); recomputeAll(); renderLive();
-    document.querySelector('.tab button[data-tab="live"]')?.click();
-  }
-  if(e.target.id==='btnSaveSetup'){
-    state.team = (document.getElementById('teamName')?.value || 'Team').trim();
-    state.formation = Number(document.getElementById('formation')?.value) || 5;
-    state.keepersMode= Number(document.getElementById('keepersMode')?.value) || 1;
-    readKeeperAssign('keepk'); recomputeAll(); renderLive(); renderDist();
-    document.querySelector('.tab button[data-tab="live"]')?.click();
-  }
-  if(e.target.id==='btnQuickRecalc'){
-    state.formation = Number(document.getElementById('quickFormation')?.value) || state.formation;
-    readKeeperAssign('quickk'); recomputeAll(); renderLive(); renderDist(); renderQuickSwapCols();
-    document.querySelector('.tab button[data-tab="live"]')?.click();
-  }
-  if(e.target.id==='btnQuickToLive'){
-    document.querySelector('.tab button[data-tab="live"]')?.click();
-    renderLive();
-  }
-  if(e.target.id==='btnApplyManualSwap'){
-    const { r1, r2 } = currentSlots();
-    if(!r1 || !r2) return;
-    const outId = state.quickSwapOut, inId = state.quickSwapIn;
-    if(!outId || !inId || outId===inId) return;
-
-    const newField = r1.field.map(id=> id===outId ? inId : id);
-    const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
-    const newBench = all.filter(id=>!newField.includes(id));
-    const forcedS2 = { start:5, end:10, field:newField, bench:newBench, out:[outId], inn:[inId] };
-
-    rebuildScheduleFromQuarter(state.q, forcedS2);
-
-    state.quickSwapOut = null; state.quickSwapIn = null;
-
-    renderLive(); renderDist(); renderQuickSwapCols();
-  }
+  });
 });
 
-document.addEventListener('change',(e)=>{
-  if(e.target.id==='keepersMode'){ state.keepersMode = Number(e.target.value)||1; keeperAssignUI('keeperAssignRow','keepk'); save(); }
+document.getElementById('btnAdd')?.addEventListener('click', ()=>{
+  state.players.push({ id:uid(), name:'Nieuwe speler', pos:'Aanvaller', present:true, benchCd:0 });
+  save(); renderPlayersList();
+});
+document.getElementById('btnReset')?.addEventListener('click', ()=>{
+  if(!confirm('Team resetten naar vaste 8 spelers?')) return;
+  state.players = DEFAULT_ORDER.map((n,i)=>({ id:uid(), name:n, pos:POS[i%3], present:true, benchCd:0 }));
+  const ps=state.players.map(p=>p.id);
+  state.keeperByQuarter=[ps[0],ps[1]||ps[0],ps[2]||ps[0],ps[3]||ps[0]];
+  recomputeAll(); document.querySelector('.tab button[data-tab="live"]')?.click(); renderLive();
+});
+document.getElementById('keepersMode')?.addEventListener('change', ()=>{
+  state.keepersMode = Number(document.getElementById('keepersMode').value)||1;
+  keeperAssignUI('keeperAssignRow','keepk'); save();
+});
+document.getElementById('btnSaveSetup')?.addEventListener('click', ()=>{
+  state.team = document.getElementById('teamName').value.trim() || 'Team';
+  state.formation = Number(document.getElementById('formation').value) || 5;
+  state.keepersMode = Number(document.getElementById('keepersMode').value) || 1;
+  readKeeperAssign('keepk'); recomputeAll(); renderLive(); renderDist();
+  document.querySelector('.tab button[data-tab="live"]')?.click();
+});
+document.getElementById('btnQuickRecalc')?.addEventListener('click', ()=>{
+  const qf=document.getElementById('quickFormation'); if(qf) state.formation = Number(qf.value) || state.formation;
+  readKeeperAssign('quickk'); recomputeAll(); renderLive(); renderDist(); renderQuick();
+  document.querySelector('.tab button[data-tab="live"]')?.click();
+});
+document.getElementById('btnQuickToLive')?.addEventListener('click', ()=>{
+  document.querySelector('.tab button[data-tab="live"]')?.click(); renderLive();
 });
 
-/* ---------- Init ---------- */
-load();
-ensureDefaults();
-recomputeAll();
-renderSetup();
-updateTimerUI();   // globale balk direct goed
+/* Pas wissel aan (hele wedstrijd herverdelen vanaf huidig kwart) */
+function applyManualSwapForCurrentQuarter(){
+  const { r1 } = currentSlots();
+  if(!r1) return;
+
+  const outId = state.quickSwapOut;
+  const inId  = state.quickSwapIn;
+  if(!outId || !inId || outId===inId) return;
+
+  const newField = r1.field.map(id => id===outId ? inId : id);
+  const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
+  const newBench = all.filter(id=>!newField.includes(id));
+
+  const forcedS2 = { start:5, end:10, field:newField, bench:newBench, out:[outId], inn:[inId] };
+
+  rebuildScheduleFromQuarter(state.q, forcedS2);
+
+  // selectie behouden (niet naar “bovenste” springen); pas resetten als je wilt
+  // state.quickSwapOut = null; state.quickSwapIn = null;
+
+  renderLive(); renderDist(); renderQuickSwapCols();
+}
+document.getElementById('btnApplyManualSwap')?.addEventListener('click', applyManualSwapForCurrentQuarter);
+
+/* Timer knoppen + overlay */
+document.getElementById('btnStart')?.addEventListener('click', start);
+document.getElementById('btnPause')?.addEventListener('click', pause);
+document.getElementById('btnDidSwap')?.addEventListener('click', hideSwap);
+
+/* ---------- INIT ---------- */
+load(); ensureDefaults(); recomputeAll(); renderSetup(); updateTimerUI();
 </script>
 </body>
 </html>
