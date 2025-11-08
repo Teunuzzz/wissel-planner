@@ -34,6 +34,13 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 }
 .player .drag{cursor:grab;-webkit-touch-callout:none}
 .player.dragging{opacity:.6}
+  .player .drag{
+  cursor: grab;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;   /* voorkomt iOS "sleep afbeelding" gedrag */
+}
+.player.dragging{opacity:.6}
+.placeholder{border:2px dashed var(--accent);border-radius:12px;height:48px}
 .placeholder{border:2px dashed var(--accent);border-radius:12px;height:48px}
 .hidden{display:none}
 .table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
@@ -324,26 +331,110 @@ function makeSortable(container){
     }, {passive:false});
   });
 }
+// Touch-friendly sortable voor iOS/Android/desktop (Pointer Events)
+function makeSortable(container){
+  let dragged=null, placeholder=null;
 
+  const onPointerMove = (e)=>{
+    if(!dragged) return;
+    e.preventDefault();
+    const y = (e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0);
+    const items = [...container.querySelectorAll('.player')].filter(el=>el!==dragged);
+    let target=null;
+    for(const el of items){
+      const r=el.getBoundingClientRect();
+      if(y>r.top && y<r.bottom){ target=el; break; }
+    }
+    if(target && placeholder){
+      const r=target.getBoundingClientRect();
+      if(y < r.top + r.height/2){
+        container.insertBefore(placeholder, target);
+      }else{
+        container.insertBefore(placeholder, target.nextSibling);
+      }
+    }
+  };
+
+  const onPointerUp = ()=>{
+    if(!dragged) return;
+    dragged.classList.remove('dragging');
+    if(placeholder && placeholder.parentNode){
+      placeholder.parentNode.insertBefore(dragged, placeholder);
+      placeholder.remove();
+    }
+    placeholder=null;
+
+    // volgorde uit DOM -> state.players
+    const ids=[...container.querySelectorAll('.player')].map(el=>el.dataset.id);
+    state.players = ids.map(id => state.players.find(p=>p.id===id));
+    save();
+
+    window.removeEventListener('pointermove', onPointerMove, {passive:false});
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp); // extra robuust
+    dragged=null;
+  };
+
+  container.querySelectorAll('.player').forEach(el=>{
+    const handle = el.querySelector('.drag') || el;
+    handle.addEventListener('pointerdown', (e)=>{
+      dragged = el;
+      dragged.classList.add('dragging');
+      placeholder = document.createElement('div');
+      placeholder.className='placeholder';
+      placeholder.style.height = el.getBoundingClientRect().height + 'px';
+      container.insertBefore(placeholder, el.nextSibling);
+      e.preventDefault();
+      window.addEventListener('pointermove', onPointerMove, {passive:false});
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+    }, {passive:false});
+  });
+}
 
 /* ===== RENDER ===== */
 function renderPlayersList(){
-  const list=document.getElementById('playerList'); list.innerHTML='';
-  let drag=null;
+  const list = document.getElementById('playerList');
+  list.innerHTML = '';
+
   state.players.forEach(p=>{
-    const el=document.createElement('div'); el.className='player'; el.draggable=true; el.dataset.id=p.id;
-    el.innerHTML=`<div class="drag">☰</div><div class="name" contenteditable="true">${p.name}</div><select class="pos">${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select><div class="present"><input type="checkbox" ${p.present?'checked':''}></div><div class="del"><button class="btn small danger">🗑</button></div>`;
-    el.querySelector('.name').addEventListener('input',e=>{p.name=e.target.textContent.trim(); save();});
-    el.querySelector('.pos').addEventListener('change',e=>{p.pos=e.target.value; save();});
-    el.querySelector('.present input').addEventListener('change',e=>{p.present=e.target.checked; save();});
-    el.querySelector('.del button').addEventListener('click',()=>{state.players=state.players.filter(x=>x.id!==p.id); save(); renderPlayersList();});
-    el.addEventListener('dragstart',()=>{drag=p.id;});
-    el.addEventListener('dragover',e=>{e.preventDefault(); el.style.outline='2px solid var(--accent)';});
-    el.addEventListener('dragleave',()=>{el.style.outline='none'});
-    el.addEventListener('drop',()=>{el.style.outline='none'; const from=state.players.findIndex(x=>x.id===drag); const to=state.players.findIndex(x=>x.id===p.id); if(from>-1&&to>-1&&from!==to){const it=state.players.splice(from,1)[0]; state.players.splice(to,0,it); save(); renderPlayersList();}});
+    const el = document.createElement('div');
+    el.className = 'player';
+    el.dataset.id = p.id;              // <-- GEEN el.draggable meer
+
+    el.innerHTML = `
+      <div class="drag">☰</div>
+      <div class="name" contenteditable="true">${p.name}</div>
+      <select class="pos">
+        ${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}
+      </select>
+      <div class="present"><input type="checkbox" ${p.present?'checked':''}></div>
+      <div class="del"><button class="btn small danger">🗑</button></div>
+    `;
+
+    // events (naam, positie, aanwezig, verwijderen)
+    el.querySelector('.name').addEventListener('input', e=>{
+      p.name = e.target.textContent.trim(); save();
+    });
+    el.querySelector('.pos').addEventListener('change', e=>{
+      p.pos = e.target.value; save();
+    });
+    el.querySelector('.present input').addEventListener('change', e=>{
+      p.present = e.target.checked; save();
+    });
+    el.querySelector('.del button').addEventListener('click', ()=>{
+      state.players = state.players.filter(x=>x.id!==p.id);
+      save(); renderPlayersList();
+    });
+
+    // ⛔️ Verwijder ALLE HTML5 drag events (dragstart/dragover/dragleave/drop)
+    // die je in je oude versie had — we gebruiken Pointer Events.
+
     list.appendChild(el);
-    makeSortable(list);
   });
+
+  // ⬇️ slechts 1x aanroepen (buiten de loop!)
+  makeSortable(list);
 }
 function renderSetup(){
   document.getElementById('teamName').value=state.team;
