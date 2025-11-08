@@ -392,6 +392,57 @@ function recomputeAll(){
   }
   state.swappedThisQuarter=false; state.elapsedMs=0; save();
 }
+<script>
+// Tel geplande minuten t/m een schema-index (incl. cooldowns) opnieuw
+function recomputeMinutesUpToIndex(lastIdx){
+  state.plannedMinutes = {};
+  state.players.forEach(p => state.plannedMinutes[p.id] = 0);
+  presentPlayers().forEach(p => p.benchCd = 0);
+
+  for(let i=0; i<=lastIdx; i++){
+    applySlotMinutes(state.schedule[i]);
+  }
+}
+
+// Herbouw vanaf kwart `startQ`; optioneel met geforceerde slot-2 voor dat kwart
+function rebuildScheduleFromQuarter(startQ, forcedS2){
+  const idxS1 = (startQ - 1) * 2;
+  const idxS2 = idxS1 + 1;
+
+  // 1) Minuten en cooldowns tot en met de slots vóór startQ herstellen
+  recomputeMinutesUpToIndex(idxS1 - 1);
+
+  // 2) Slot-1 van startQ behouden of opnieuw bouwen
+  const kStart = keeperFor(startQ);
+  let s1 = state.schedule[idxS1];
+  if(!s1 || s1.q !== startQ || s1.slot !== 1){
+    const prevField = (idxS1 - 1 >= 0) ? state.schedule[idxS1 - 1].field.slice() : null;
+    s1 = buildSlot(startQ, 1, kStart, prevField);
+  }
+  state.schedule[idxS1] = s1;
+  applySlotMinutes(s1);
+
+  // 3) Slot-2 van startQ: gebruik de geforceerde versie (van je handmatige wissel) of bouw hem
+  let s2 = forcedS2 ? { ...forcedS2, q:startQ, slot:2, keeper:kStart }
+                    : buildSlot(startQ, 2, kStart, s1.field);
+  state.schedule[idxS2] = s2;
+  applySlotMinutes(s2);
+
+  // 4) Alle volgende kwarten opnieuw en eerlijk herplannen
+  let prevField = s2.field.slice();
+  for(let q = startQ + 1; q <= 4; q++){
+    const k = keeperFor(q);
+    const i1 = (q - 1) * 2, i2 = i1 + 1;
+    const ns1 = buildSlot(q, 1, k, prevField);
+    state.schedule[i1] = ns1; applySlotMinutes(ns1);
+    const ns2 = buildSlot(q, 2, k, ns1.field);
+    state.schedule[i2] = ns2; applySlotMinutes(ns2);
+    prevField = ns2.field.slice();
+  }
+
+  save();
+}
+</script>
 
 /* ========== SORTABLE (touch-friendly) ========== */
 function makeSortable(container){
@@ -487,20 +538,9 @@ function renderQuick(){
   keeperAssignUI('quickKeeperAssign','quickk');
   // In plaats van dropdowns:
   renderQuickSwapCols();
-  populateManualSwapUI();
+
 }
-function populateManualSwapUI(){
-  const r1=state.schedule.find(r=>r.q===state.q && r.slot===1);
-  const r2=state.schedule.find(r=>r.q===state.q && r.slot===2);
-  const outSel=document.getElementById('manualOut'); const inSel=document.getElementById('manualIn');
-  if(!outSel||!inSel||!r1||!r2) return;
-  outSel.innerHTML = r1.field.map(id=>`<option value="${id}">${nameBy(id)}</option>`).join('');
-  inSel.innerHTML  = r1.bench.map(id=>`<option value="${id}">${nameBy(id)}</option>`).join('');
-  const defOut=(r2.out && r2.out[0]) || r1.field[0];
-  const defIn =(r2.inn && r2.inn[0]) || r1.bench[0];
-  if(defOut) outSel.value=defOut;
-  if(defIn)  inSel.value=defIn;
-}
+
 function renderDist(){
   const body=document.querySelector('#distSwaps tbody'); body.innerHTML='';
   state.schedule.forEach(r=>{
@@ -664,7 +704,7 @@ document.getElementById('btnSaveSetup').addEventListener('click', ()=>{
 });
 document.getElementById('btnQuickRecalc').addEventListener('click', ()=>{
   state.formation = Number(document.getElementById('quickFormation').value) || state.formation;
-  readKeeperAssign('quickk'); recomputeAll(); renderLive(); renderDist(); populateManualSwapUI();
+  readKeeperAssign('quickk'); recomputeAll(); renderLive(); renderDist(); 
   document.querySelector('.tab button[data-tab="live"]').click();
 });
 document.getElementById('btnQuickToLive').addEventListener('click', ()=>{ document.querySelector('.tab button[data-tab="live"]').click(); renderLive(); });
