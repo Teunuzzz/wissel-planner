@@ -27,12 +27,11 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 .grid2{display:grid;grid-template-columns:1fr;gap:8px}@media(min-width:560px){.grid2{grid-template-columns:1fr 1fr}}
 .list{display:flex;flex-direction:column;gap:8px}
 .player{
-  display:flex;align-items:centerq;gap:8px;padding:10px;
+  display:flex;align-items:center;gap:8px;padding:10px;
   border:1px solid var(--border);border-radius:12px;background:#0b1324;
   touch-action:none;                /* belangrijk voor iOS */
   -webkit-user-select:none; user-select:none;  /* voorkomt tekstselectie */
 }
-.player .drag{cursor:grab;-webkit-touch-callout:none}
 .player.dragging{opacity:.6}
   .player .drag{
   cursor: grab;
@@ -125,7 +124,6 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
     <div class="timer">
       <div class="big" id="clock">10:00</div>
       <div class="pill" id="lblQuarter">Kwart 1 / 4</div>
-      <div class="pill" id="lblView">Bekijken: 1 / 4</div>
       <button class="btn" id="btnStart">▶ Start</button>
       <button class="btn secondary" id="btnPause">⏸︎ Pauze</button>
     </div>
@@ -634,8 +632,45 @@ function updateTimerUI(){
   if (marker) marker.style.left = markerLeft + '%';
 }
 
-let tick=null;
-function start(){if(state.running) return; state.running=true; const base=Date.now()-state.elapsedMs; tick=setInterval(()=>{state.elapsedMs=Date.now()-base; if(!state.swappedThisQuarter && state.elapsedMs>=state.swapAtMs){showSwap(); state.swappedThisQuarter=true;} if(state.elapsedMs>=state.quarterMs){state.elapsedMs=state.quarterMs; pause();} updateTimerUI();},200);}
+let tick = null;
+function start(){
+  if(state.running) return;
+  state.running = true;
+  const base = Date.now() - state.elapsedMs;
+
+  tick = setInterval(()=>{
+    state.elapsedMs = Date.now() - base;
+
+    if(!state.swappedThisQuarter && state.elapsedMs >= state.swapAtMs){
+      showSwap();
+      state.swappedThisQuarter = true;
+    }
+
+    if(state.elapsedMs >= state.quarterMs){
+      state.elapsedMs = state.quarterMs;
+      pause(); // stop interval
+
+      // klaar met kwart → kwart ophogen en klaarzetten
+      if(state.q < 4){
+        state.q += 1;
+        state.elapsedMs = 0;
+        state.swappedThisQuarter = false;
+        renderLive(); // toon meteen het nieuwe kwart met 10:00
+      }
+      save();
+      return;
+    }
+
+    updateTimerUI();
+  }, 200);
+}
+
+function pause(){
+  state.running = false;
+  if(tick){ clearInterval(tick); tick = null; }
+  save();
+}
+
 function pause(){state.running=false; if(tick){clearInterval(tick); tick=null;} save();}
 function showSwap(){const r=state.schedule.find(x=>x.q===state.q && x.slot===2); const out=(r?.out||[]).map(nameBy); const inn=(r?.inn||[]).map(nameBy); document.getElementById('swapOut').innerHTML=out.map(n=>`<div class="namechip">${n}</div>`).join('')||'<div class="namechip">—</div>'; document.getElementById('swapIn').innerHTML=inn.map(n=>`<div class="namechip">${n}</div>`).join('')||'<div class="namechip">—</div>'; document.getElementById('swapOverlay').style.display='flex'; try{navigator.vibrate&&navigator.vibrate([120,80,120]);}catch(e){}}
 function hideSwap(){document.getElementById('swapOverlay').style.display='none'; try{navigator.vibrate&&navigator.vibrate([60]);}catch(e){}}
@@ -654,7 +689,6 @@ document.getElementById('btnPause').addEventListener('click',pause);
 document.getElementById('btnDidSwap').addEventListener('click',()=>{hideSwap();});
 
 /* BOOT */
-function updateTimerUI(){document.getElementById('clock').textContent=fmt(state.elapsedMs); document.getElementById('progressBar').style.width=Math.min(100,(state.elapsedMs/state.quarterMs)*100)+'%';}
 load(); ensureDefaults(); recomputeAll(); renderSetup();
 </script>
 </body>
