@@ -551,6 +551,64 @@ function populateManualSwapUI(){
   outSel.value = defOut || '';
   inSel.value  = defIn  || '';
 }
+
+// Tel geplande minuten opnieuw tot en met een gegeven index in state.schedule
+function recomputeMinutesUpToIndex(endIdx){
+  state.plannedMinutes = {};
+  state.players.forEach(p => state.plannedMinutes[p.id] = 0);
+  presentPlayers().forEach(p => p.benchCd = 0); // reset cooldowns
+
+  for(let i=0; i<=endIdx; i++){
+    applySlotMinutes(state.schedule[i]);
+  }
+}
+
+// Bouw het schema opnieuw vanaf kwart q (1..4), met mogelijkheid om slot-2 van q te forceren
+function rebuildScheduleFromQuarter(startQ, forcedS2ForStartQ){
+  // 1) Vind indices in het schema
+  const idxS1 = (startQ-1)*2;      // slot-1 index
+  const idxS2 = (startQ-1)*2 + 1;  // slot-2 index
+
+  // 2) Tel minuten van alles vóór startQ opnieuw
+  recomputeMinutesUpToIndex(idxS1 - 1);  // tot en met vorige kwart
+
+  // 3) Begin met de veldbezetting die slot-1 van startQ bepaalt
+  const kStart = keeperFor(startQ);
+  // Pak de bestaande slot-1 als basis (zodat jouw geplande s1 blijft staan),
+  // maar als je liever volledig herbouwt, vervang de volgende regel door buildSlot(...)
+  let s1 = {...state.schedule[idxS1]};
+  if (!s1 || s1.q !== startQ || s1.slot !== 1){
+    // failsafe: herbouw slot-1 als die niet klopt
+    const prevField = (idxS1-1 >= 0) ? state.schedule[idxS1-1].field.slice() : null;
+    s1 = buildSlot(startQ, 1, kStart, prevField);
+  }
+  state.schedule[idxS1] = s1;
+  applySlotMinutes(s1);
+
+  // 4) Slot-2 van startQ: gebruik de geforceerde versie als die is meegegeven, anders herbouw
+  let s2;
+  if (forcedS2ForStartQ){
+    s2 = {...forcedS2ForStartQ, q:startQ, slot:2, keeper:kStart};
+  } else {
+    s2 = buildSlot(startQ, 2, kStart, s1.field);
+  }
+  state.schedule[idxS2] = s2;
+  applySlotMinutes(s2);
+
+  // 5) Alle latere kwarten opnieuw doorrekenen op basis van de net ontstane situatie
+  let prevField = s2.field.slice();
+  for (let q = startQ + 1; q <= 4; q++){
+    const k = keeperFor(q);
+    const i1 = (q-1)*2, i2 = i1+1;
+    const ns1 = buildSlot(q, 1, k, prevField);
+    state.schedule[i1] = ns1; applySlotMinutes(ns1);
+    const ns2 = buildSlot(q, 2, k, ns1.field);
+    state.schedule[i2] = ns2; applySlotMinutes(ns2);
+    prevField = ns2.field.slice();
+  }
+
+  save();
+}
   
 function applyManualSwapForCurrentQuarter(){
   const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
@@ -566,40 +624,32 @@ function applyManualSwapForCurrentQuarter(){
   const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
   const newBench = all.filter(id=>!newField.includes(id));
 
-  r2.field = newField;
-  r2.bench = newBench;
-  r2.out   = [outId];
-  r2.inn   = [inId];
+  // Geforceerde s2 voor het huidige kwart
+  const forcedS2 = {
+    q: state.q,
+    slot: 2,
+    start: 5, end: 10,
+    keeper: r1.keeper,
+    field: newField,
+    bench: newBench,
+    out: [outId],
+    inn: [inId]
+  };
 
-  // Speelminuten vanaf huidig kwart opnieuw tellen (fair naar voren toe)
-  // 1) reset geplande minuten
-  state.plannedMinutes = {};
-  state.players.forEach(p=> state.plannedMinutes[p.id]=0);
-  // 2) loop door schedule en tel vanaf Q1 t/m Q4 opnieuw
-  //    (maar gebruik r2 voor huidig kwart zoals net ingesteld)
-  const oldSchedule = state.schedule.map(s=>({...s}));
-  state.schedule = [];
-  let prevField = null;
-  for(let q=1;q<=4;q++){
-    const k = keeperFor(q);
-    // slot1: als q==state.q gebruik bestaande r1, anders herbouw
-    let s1 = (q===state.q) ? {...oldSchedule.find(x=>x.q===q && x.slot===1)} :
-                             buildSlot(q,1,k,prevField);
-    applySlotMinutes(s1);
-    state.schedule.push(s1);
+  // Rebuild vanaf huidig kwart o.b.v. forced slot-2
+  rebuildScheduleFromQuarter(state.q, forcedS2);
 
-    // slot2: als q==state.q gebruik gemodificeerde r2, anders herbouw o.b.v. s1
-    let s2 = (q===state.q) ? {...r2} : buildSlot(q,2,k,s1.field);
-    applySlotMinutes(s2);
-    state.schedule.push(s2);
+  // UI bijwerken (beide tabbladen)
+  renderLive();
+  renderDist();
 
-    prevField = s2.field.slice();
-  }
+  // Snelle-wijzigingen selector opnieuw vullen zodat de nieuwe realiteit zichtbaar is
+  populateManualSwapUI();
 
-  save();
-  renderLive(); // live bijwerken
-  alert('Wissel voor dit kwart aangepast.');
+  // Ter bevestiging (optioneel)
+  // alert('Wissel voor dit kwart aangepast en herverdeeld.');
 }
+
 document.getElementById('btnApplyManualSwap').addEventListener('click', applyManualSwapForCurrentQuarter);
 
   
@@ -680,8 +730,29 @@ document.querySelectorAll('.tab button').forEach(btn=>btn.addEventListener('clic
 document.getElementById('btnAdd').addEventListener('click',()=>{state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,benchCd:0}); save(); renderPlayersList();});
 document.getElementById('btnReset').addEventListener('click',()=>{if(confirm('Team resetten naar vaste 8 spelers?')){state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name:n,pos:POS[i%3],present:true,benchCd:0})); const ps=state.players.map(p=>p.id); state.keeperByQuarter=[ps[0],ps[1]||ps[0],ps[2]||ps[0],ps[3]||ps[0]]; recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();}});
 document.getElementById('keepersMode').addEventListener('change',()=>{state.keepersMode=Number(document.getElementById('keepersMode').value)||1; keeperAssignUI('keeperAssignRow','keepk'); save();});
-document.getElementById('btnSaveSetup').addEventListener('click',()=>{state.team=document.getElementById('teamName').value.trim()||'Team'; state.formation=Number(document.getElementById('formation').value)||5; state.keepersMode=Number(document.getElementById('keepersMode').value)||1; readKeeperAssign('keepk'); recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();});
-document.getElementById('btnQuickRecalc').addEventListener('click',()=>{state.formation=Number(document.getElementById('quickFormation').value)||state.formation; readKeeperAssign('quickk'); recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();});
+// 💾 Opslaan in Setup & naar Live
+document.getElementById('btnSaveSetup').addEventListener('click', ()=>{
+  state.team = document.getElementById('teamName').value.trim() || 'Team';
+  state.formation = Number(document.getElementById('formation').value) || 5;
+  state.keepersMode = Number(document.getElementById('keepersMode').value) || 1;
+  readKeeperAssign('keepk');         // Lees keeperkeuzes uit Setup-tab
+  recomputeAll();                    // Herbereken alles
+  renderLive();                      // Update Live
+  renderDist();                      // ✅ Voeg toe — direct ook Verdeling updaten
+  document.querySelector('.tab button[data-tab="live"]').click(); // Ga naar Live
+});
+
+// 🔄 Herberekenen in tab Snelle wijzigingen
+document.getElementById('btnQuickRecalc').addEventListener('click', ()=>{
+  state.formation = Number(document.getElementById('quickFormation').value) || state.formation;
+  readKeeperAssign('quickk');        // Lees keeperwijzigingen uit Snelle Wijzigingen
+  recomputeAll();                    // Herbereken alles vanaf nul (met actuele spelers)
+  renderLive();                      // Update Live-tab
+  renderDist();                      // ✅ Update Verdeling-tab
+  populateManualSwapUI();            // ✅ Ververs ook dropdowns in Snelle Wijzigingen
+  document.querySelector('.tab button[data-tab="live"]').click(); // Ga naar Live-tab
+});
+
 document.getElementById('btnQuickToLive').addEventListener('click',()=>{document.querySelector('.tab button[data-tab="live"]').click(); state.viewQ=state.q; renderLive();});
 
 document.getElementById('btnStart').addEventListener('click',start);
