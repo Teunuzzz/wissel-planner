@@ -26,8 +26,15 @@
 input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1324;color:var(--text)}
 .grid2{display:grid;grid-template-columns:1fr;gap:8px}@media(min-width:560px){.grid2{grid-template-columns:1fr 1fr}}
 .list{display:flex;flex-direction:column;gap:8px}
-.player{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#0b1324}
-.player .drag{cursor:grab}.player .name{flex:1}.player .pos{width:140px}.player .present{width:36px;text-align:center}.player .del{width:40px;text-align:center}
+.player{
+  display:flex;align-items:center;gap:8px;padding:10px;
+  border:1px solid var(--border);border-radius:12px;background:#0b1324;
+  touch-action:none;                /* belangrijk voor iOS */
+  -webkit-user-select:none; user-select:none;  /* voorkomt tekstselectie */
+}
+.player .drag{cursor:grab;-webkit-touch-callout:none}
+.player.dragging{opacity:.6}
+.placeholder{border:2px dashed var(--accent);border-radius:12px;height:48px}
 .hidden{display:none}
 .table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
 .timer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.big{font-size:44px;font-weight:800}
@@ -257,6 +264,68 @@ function applySlotMinutes(r){
   });
 }
 
+ 
+// Touch-friendly sortable voor iOS (werkt ook met muis)
+function makeSortable(container){
+  let dragged=null, placeholder=null;
+
+  const onPointerMove = (e)=>{
+    if(!dragged) return;
+    e.preventDefault();
+    const y = (e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0);
+    const items = [...container.querySelectorAll('.player')].filter(el=>el!==dragged);
+    let target=null;
+    for(const el of items){
+      const r=el.getBoundingClientRect();
+      if(y>r.top && y<r.bottom){ target=el; break; }
+    }
+    if(target && placeholder){
+      const r=target.getBoundingClientRect();
+      if(y < r.top + r.height/2){
+        container.insertBefore(placeholder, target);
+      }else{
+        container.insertBefore(placeholder, target.nextSibling);
+      }
+    }
+  };
+
+  const onPointerUp = ()=>{
+    if(!dragged) return;
+    dragged.classList.remove('dragging');
+    if(placeholder && placeholder.parentNode){
+      placeholder.parentNode.insertBefore(dragged, placeholder);
+      placeholder.remove();
+    }
+    placeholder=null;
+
+    // state.players volgorde updaten op basis van DOM
+    const ids=[...container.querySelectorAll('.player')].map(el=>el.dataset.id);
+    state.players = ids.map(id => state.players.find(p=>p.id===id));
+    save();
+
+    window.removeEventListener('pointermove', onPointerMove, {passive:false});
+    window.removeEventListener('pointerup', onPointerUp);
+    dragged=null;
+  };
+
+  // pointerstart op handvat (☰) of hele kaart
+  container.querySelectorAll('.player').forEach(el=>{
+    const handle = el.querySelector('.drag') || el;
+    handle.addEventListener('pointerdown', (e)=>{
+      dragged = el;
+      dragged.classList.add('dragging');
+      placeholder = document.createElement('div');
+      placeholder.className='placeholder';
+      placeholder.style.height = el.getBoundingClientRect().height + 'px';
+      container.insertBefore(placeholder, el.nextSibling);
+      e.preventDefault();
+      window.addEventListener('pointermove', onPointerMove, {passive:false});
+      window.addEventListener('pointerup', onPointerUp);
+    }, {passive:false});
+  });
+}
+
+
 /* ===== RENDER ===== */
 function renderPlayersList(){
   const list=document.getElementById('playerList'); list.innerHTML='';
@@ -273,6 +342,7 @@ function renderPlayersList(){
     el.addEventListener('dragleave',()=>{el.style.outline='none'});
     el.addEventListener('drop',()=>{el.style.outline='none'; const from=state.players.findIndex(x=>x.id===drag); const to=state.players.findIndex(x=>x.id===p.id); if(from>-1&&to>-1&&from!==to){const it=state.players.splice(from,1)[0]; state.players.splice(to,0,it); save(); renderPlayersList();}});
     list.appendChild(el);
+    makeSortable(list);
   });
 }
 function renderSetup(){
