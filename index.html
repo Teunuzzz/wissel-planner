@@ -603,6 +603,8 @@ function renderQuick(){
   const qf=document.getElementById('quickFormation'); if(qf){ qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation); }
   keeperAssignUI('quickKeeperAssign','quickk');
   renderQuickSwapCols();
+  syncQuickSlotView();  // direct goedzetten wanneer je naar dit tabblad gaat
+
 }
 
 function renderDist(){
@@ -676,6 +678,26 @@ function renderQuickSwapCols(){
   });
 })();
 
+function currentSlotInQuarter(){
+  // 1 = eerste helft van het kwart (00–05), 2 = tweede helft (05–10)
+  return state.elapsedMs < state.swapAtMs ? 1 : 2;
+}
+
+function syncQuickSlotView(){
+  const desired = currentSlotInQuarter();
+  if (state.slotView !== desired) {
+    state.slotView = desired;
+    // (optioneel) als je de radio’s nog hebt staan:
+    const r = document.querySelector(`input[name="slotView"][value="${desired}"]`);
+    if (r) r.checked = true;
+    renderQuickSwapCols();
+  } else {
+    // nog steeds updaten als selecties/velden veranderd zijn
+    renderQuickSwapCols();
+  }
+}
+  
+
 /* ---------- TIMER + PROGRESS ---------- */
 function fmt(ms){ const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000)); const m=Math.floor(t/60); const s=String(t%60).padStart(2,'0'); return `${m}:${s}`; }
 function updateTimerUI(){
@@ -700,13 +722,18 @@ function start(){
     if(state.elapsedMs >= state.quarterMs){
       state.elapsedMs = state.quarterMs; pause();
       if(state.q < 4){
-        state.q += 1; state.elapsedMs = 0; state.swappedThisQuarter=false;
+        state.q += 1;
+        state.elapsedMs = 0;
+        state.swappedThisQuarter = false;
+        syncQuickSlotView();
         renderLive();
       }
       save(); return;
     }
-    updateTimerUI();
+updateTimerUI();
+syncQuickSlotView(); 
   }, 200);
+  
 }
 function pause(){ state.running=false; if(tick){clearInterval(tick); tick=null;} save(); }
 function showSwap(){
