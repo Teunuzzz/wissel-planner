@@ -802,29 +802,46 @@ document.addEventListener('click', (e) => {
   }
 
   /* ---- Handmatige wissel definitief maken ---- */
-  if (btn.id === 'btnApplyManualSwap') {
-    const { r1, r2 } = currentSlots();
-    if (!r1 || !r2) return;
+if (btn.id === 'btnApplyManualSwap') {
+  console.group('🟡 Handmatige wissel – debuglog');
+  const { r1, r2 } = currentSlots();
+  console.log('Huidige kwart:', state.q);
+  console.log('Slot-1 veld:', r1?.field?.map(nameBy));
+  console.log('Slot-1 bench:', r1?.bench?.map(nameBy));
+  console.log('Slot-2 (oud):', r2?.field?.map(nameBy));
+  console.log('Geselecteerd OUT:', state.quickSwapOut, nameBy(state.quickSwapOut));
+  console.log('Geselecteerd IN:',  state.quickSwapIn,  nameBy(state.quickSwapIn));
 
-    const outId = state.quickSwapOut;
-    const inId  = state.quickSwapIn;
-    if (!outId || !inId || outId === inId) return;
-
-    // Bouw nieuw veld & bank voor slot-2 van huidig kwart
-    const newField = r1.field.map(id => id === outId ? inId : id);
-    const allIds   = presentPlayers().map(p => p.id).filter(id => id !== r1.keeper);
-    const newBench = allIds.filter(id => !newField.includes(id));
-    const forcedS2 = { start: 5, end: 10, field: newField, bench: newBench, out: [outId], inn: [inId] };
-
-    // Herplan vanaf huidig kwart; eerdere periodes blijven staan, tellen wel mee
-    rebuildScheduleFromQuarter(state.q, forcedS2);
-
-    // (Optioneel) staging resetten:
-    // state.quickSwapOut = null; state.quickSwapIn = null;
-
-    renderLive(); renderDist(); renderQuickSwapCols();
+  if (!r1 || !r2) {
+    console.warn('❌ currentSlots() geeft geen resultaat — mogelijk geen schema geladen');
+    console.groupEnd();
     return;
   }
+  const outId = state.quickSwapOut, inId = state.quickSwapIn;
+  if (!outId || !inId || outId === inId) {
+    console.warn('⚠️ Geen geldige OUT/IN selectie');
+    console.groupEnd();
+    return;
+  }
+
+  const newField = r1.field.map(id => id === outId ? inId : id);
+  const allIds   = presentPlayers().map(p => p.id).filter(id => id !== r1.keeper);
+  const newBench = allIds.filter(id => !newField.includes(id));
+  const forcedS2 = { start:5, end:10, field:newField, bench:newBench, out:[outId], inn:[inId] };
+
+  console.log('→ Nieuw veld:', newField.map(nameBy));
+  console.log('→ Nieuwe bank:', newBench.map(nameBy));
+
+  try {
+    rebuildScheduleFromQuarter(state.q, forcedS2);
+    renderLive(); renderDist(); renderQuickSwapCols();
+    console.info('✅ Herberekend en UI geüpdatet');
+  } catch (err) {
+    console.error('💥 Fout tijdens herberekening:', err);
+  }
+  console.groupEnd();
+}
+
 });
 
 // 2) Dropdown-wijzigingen die UI moeten updaten
