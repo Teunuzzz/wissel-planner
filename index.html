@@ -120,9 +120,16 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 <div class="container">
   <h1>Wisselplanner <small style="color:var(--accent)">De Esch</small></h1>
 
-  <div class="tabs">
-    <!-- Globale wedstrijd-progress (zichtbaar op alle tabbladen) -->
-<div class="card" id="globalProgress" style="margin-top:6px">
+<!-- Navigatietabs -->
+<div class="tabs">
+  <div class="tab"><button class="active" data-tab="setup">Setup & Spelers</button></div>
+  <div class="tab"><button data-tab="live">Live</button></div>
+  <div class="tab"><button data-tab="quick">Snelle wijzigingen</button></div>
+  <div class="tab"><button data-tab="dist">Verdeling</button></div>
+</div>
+
+<!-- Globale wedstrijd-progress (zichtbaar op alle tabbladen) -->
+<div class="card" id="globalProgress" style="margin-top:10px">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
     <div class="pill" id="lblQuarter">Kwart 1 / 4</div>
     <div class="big" id="clock" style="font-size:28px;line-height:1">10:00</div>
@@ -133,11 +140,6 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
   </div>
 </div>
 
-    <div class="tab"><button class="active" data-tab="setup">Setup & Spelers</button></div>
-    <div class="tab"><button data-tab="live">Live</button></div>
-    <div class="tab"><button data-tab="quick">Snelle wijzigingen</button></div>
-    <div class="tab"><button data-tab="dist">Verdeling</button></div>
-  </div>
 
   <!-- TAB: Setup -->
   <section id="tab-setup" class="card">
@@ -537,11 +539,21 @@ function renderQuick(){
     line.querySelector('input').addEventListener('change',e=>{ p.present=e.target.checked; save(); });
     cont.appendChild(line);
   });
-  const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
-  keeperAssignUI('quickKeeperAssign','quickk');
-  // In plaats van dropdowns:
-  renderQuickSwapCols();
 
+  const qf=document.getElementById('quickFormation');
+  qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join('');
+  qf.value=String(state.formation);
+
+  keeperAssignUI('quickKeeperAssign','quickk');
+
+  // >>> Zet veilige defaults voor OUT/IN (op basis van huidig kwart)
+  const { r1, r2 } = currentSlots();
+  if (r1) {
+    if (!r1.field.includes(state.quickSwapOut)) state.quickSwapOut = r1.field[0] || null;
+    if (!r1.bench.includes(state.quickSwapIn))  state.quickSwapIn  = r1.bench[0] || null;
+  }
+
+  renderQuickSwapCols();
 }
 
 function renderDist(){
@@ -738,6 +750,8 @@ function applyManualSwapForCurrentQuarter(){
   renderQuickSwapCols();
 }
 document.getElementById('btnApplyManualSwap').addEventListener('click', applyManualSwapForCurrentQuarter);
+document.getElementById('btnStart').addEventListener('click', start);
+document.getElementById('btnPause').addEventListener('click', pause);
 
 
 /* INIT */
