@@ -1,191 +1,230 @@
 <!doctype html>
 <html lang="nl">
 <head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wisselplanner – De Esch</title>
+<meta name="theme-color" content="#0a1324">
+<link rel="apple-touch-icon" href="icon-512.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0d1422">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wisselplanner">
-<link rel="apple-touch-icon" href="icon-512.png">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d1422">
-<title>Wisselplanner</title>
+
 <style>
-:root{--bg:#0b1220;--panel:#0f172a;--border:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--accent:#2b67f6;--danger:#ef4444;--ok:#16a34a}
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Arial}
+:root{
+  --bg:#0a1324;             /* donkerblauw achtergrond */
+  --panel:#10203f;          /* iets lichter paneel */
+  --border:#1e2b4a;
+  --text:#f8fafc;
+  --muted:#9ca3af;
+  --accent:#f6c500;         /* geel accent */
+  --accent-dark:#b79400;    /* donkerder geel voor hover */
+  --danger:#ef4444;
+  --ok:#16a34a;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font:16px/1.4 "Segoe UI",system-ui,Roboto,Arial;
+}
 .container{max-width:900px;margin:0 auto;padding:12px}
+
+/* Tabs */
 .tabs{display:flex;gap:6px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:10}
-.tab{flex:1}.tab button{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0f172a;color:var(--text);font-weight:700;cursor:pointer}
-.tab button.active{background:var(--accent);border-color:transparent}
-.card{background:#0f172a;border:1px solid var(--border);border-radius:14px;padding:12px;margin:8px 0}
+.tab{flex:1}
+.tab button{
+  width:100%;padding:12px;border-radius:12px;
+  border:1px solid var(--border);
+  background:var(--panel);color:var(--text);
+  font-weight:700;cursor:pointer;transition:background .2s,border .2s;
+}
+.tab button.active{background:var(--accent);color:#000;border-color:transparent}
+.tab button:hover{background:var(--accent-dark);color:#000}
+
+/* Panels, knoppen enz. */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;margin:8px 0}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.btn{padding:12px 14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
-.btn.secondary{background:#1f2937}.btn.danger{background:var(--danger)}.btn.small{padding:8px 10px}
-.pill{padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0a1322}
-input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1324;color:var(--text)}
+.btn{padding:12px 14px;border-radius:12px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;transition:background .2s}
+.btn:hover{background:var(--accent-dark)}
+.btn.secondary{background:#1e2b4a;color:#fff}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.small{padding:8px 10px;font-size:.9em}
+.pill{padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#08172e}
+input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#08172e;color:var(--text)}
 .grid2{display:grid;grid-template-columns:1fr;gap:8px}@media(min-width:560px){.grid2{grid-template-columns:1fr 1fr}}
 .list{display:flex;flex-direction:column;gap:8px}
-.player{
-  display:flex;align-items:center;gap:8px;padding:10px;
-  border:1px solid var(--border);border-radius:12px;background:#0b1324;
-  touch-action:none;                /* belangrijk voor iOS */
-  -webkit-user-select:none; user-select:none;  /* voorkomt tekstselectie */
-}
+
+/* Spelers */
+.player{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#08172e;touch-action:none;-webkit-user-select:none;user-select:none}
 .player.dragging{opacity:.6}
-  .player .drag{
-  cursor: grab;
-  -webkit-touch-callout: none;
-  -webkit-user-drag: none;   /* voorkomt iOS "sleep afbeelding" gedrag */
-}
-.player.dragging{opacity:.6}
-.placeholder{border:2px dashed var(--accent);border-radius:12px;height:48px}
+.player .drag{cursor:grab;-webkit-touch-callout:none;-webkit-user-drag:none}
 .placeholder{border:2px dashed var(--accent);border-radius:12px;height:48px}
 .hidden{display:none}
-.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
-.timer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.big{font-size:44px;font-weight:800}
-.progress{height:10px;border-radius:999px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
-.progress>div{height:100%;background:var(--accent);width:0%}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
-.overlay .panel{max-width:560px;width:100%;background:#0f172a;border:1px solid var(--border);border-radius:16px;padding:16px;text-align:center}
-.swaplist{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0}
-.swaplist .col{flex:1 1 220px;background:#0b1324;border:1px solid var(--border);border-radius:12px;padding:12px}
-.namechip{padding:10px;border:1px solid var(--border);border-radius:10px;margin:6px 0;background:#0a1322}
-.bar{height:8px;border-radius:8px;background:#0b1324;border:1px solid var(--border);overflow:hidden}
-.bar>div{height:100%;background:#16a34a;width:0%}
-/* Wedstrijdprogress in 4 segmenten */
-.match-progress{
-  position:relative;
-  height:14px;
-  border-radius:999px;
-  background:#0b1324;
-  border:1px solid var(--border);
-  overflow:hidden;
-}
 
-/* 4 segmentlijnen (25%, 50%, 75%) */
+/* Tabellen */
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:10px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
+.table th{color:var(--accent);text-transform:uppercase;font-size:.85em;letter-spacing:.05em}
+
+/* Timer en voortgang */
+.timer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.big{font-size:44px;font-weight:800}
+.match-progress{height:12px;border-radius:999px;background:#08172e;border:1px solid var(--border);overflow:hidden;position:relative}
 .match-progress::after{
   content:"";
-  position:absolute; inset:0;
+  position:absolute;inset:0;
   background:
-    linear-gradient(to right, transparent 24.5%, var(--border) 24.5%, var(--border) 25.5%, transparent 25.5%),
-    linear-gradient(to right, transparent 49.5%, var(--border) 49.5%, var(--border) 50.5%, transparent 50.5%),
-    linear-gradient(to right, transparent 74.5%, var(--border) 74.5%, var(--border) 75.5%, transparent 75.5%);
+    linear-gradient(to right,transparent 24.5%,var(--border) 24.5%,var(--border) 25.5%,transparent 25.5%),
+    linear-gradient(to right,transparent 49.5%,var(--border) 49.5%,var(--border) 50.5%,transparent 50.5%),
+    linear-gradient(to right,transparent 74.5%,var(--border) 74.5%,var(--border) 75.5%,transparent 75.5%);
   pointer-events:none;
 }
+.match-progress .fill{position:absolute;left:0;top:0;height:100%;background:var(--accent);width:0%}
+.match-progress .q-marker{position:absolute;top:-3px;width:2px;height:20px;background:var(--accent);border-radius:2px;left:0%;box-shadow:0 0 4px rgba(0,0,0,.4)}
 
-.match-progress .fill{
-  position:absolute; left:0; top:0; height:100%;
-  background:var(--accent);
-  width:0%;
-}
+/* Overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.overlay .panel{max-width:560px;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;text-align:center}
+.swaplist{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+.swaplist .col{flex:1 1 220px;background:#08172e;border:1px solid var(--border);border-radius:12px;padding:12px}
+.namechip{padding:10px;border:1px solid var(--border);border-radius:10px;margin:6px 0;background:#08172e}
+.bar{height:8px;border-radius:8px;background:#08172e;border:1px solid var(--border);overflow:hidden}
+.bar>div{height:100%;background:var(--accent);width:0%}
 
-/* Marker van het huidige kwart */
-.match-progress .q-marker{
-  position:absolute; top:-3px; width:2px; height:20px;
-  background:#e5e7eb; border-radius:2px;
-  left:0%;
-  box-shadow:0 0 0 2px rgba(0,0,0,.25);
-}
-
+/* Kolommen Snelle wijzigingen */
+.col-field{background:rgba(246,197,0,.1);border:1px solid var(--accent)}
+.col-bench{background:rgba(10,19,36,.8);border:1px solid var(--border)}
 </style>
 </head>
+
 <body>
 <div class="container">
-  <h1>Wisselplanner</h1>
+  <h1>Wisselplanner <small style="color:var(--accent)">De Esch</small></h1>
+
   <div class="tabs">
-    <div class="tab"><button class="active" data-tab="setup">Setup &amp; Spelers</button></div>
+    <div class="tab"><button class="active" data-tab="setup">Setup & Spelers</button></div>
     <div class="tab"><button data-tab="live">Live</button></div>
     <div class="tab"><button data-tab="quick">Snelle wijzigingen</button></div>
     <div class="tab"><button data-tab="dist">Verdeling</button></div>
   </div>
 
+  <!-- TAB: Setup -->
   <section id="tab-setup" class="card">
-    <h2>Team &amp; spelers</h2>
+    <h2>Team & Spelers</h2>
     <div class="grid2 card">
       <div><label>Teamnaam</label><input id="teamName" placeholder="Teamnaam" value="De Esch O9"></div>
-      <div><label>Formatie (aantal veldspelers)</label><select id="formation"><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option></select></div>
-      <div><label>Keepers per wedstrijd</label><select id="keepersMode"><option value="1">1 keeper (hele wedstrijd)</option><option value="2">2 keepers (helften)</option><option value="4" selected>4 keepers (kwarten)</option></select></div>
+      <div><label>Formatie (aantal veldspelers)</label>
+        <select id="formation">
+          <option value="4">4</option><option value="5" selected>5</option><option value="6">6</option>
+        </select>
+      </div>
+      <div><label>Keepers per wedstrijd</label>
+        <select id="keepersMode">
+          <option value="1">1 keeper (hele wedstrijd)</option>
+          <option value="2">2 keepers (helften)</option>
+          <option value="4" selected>4 keepers (kwarten)</option>
+        </select>
+      </div>
       <div id="keeperAssignBox"><label>Keeper-keuze (volgens modus)</label><div class="row" id="keeperAssignRow"></div></div>
     </div>
 
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Spelers (sleep om te rangschikken)</h2>
-        <div class="row"><button class="btn small" id="btnAdd">+ Speler</button><button class="btn small danger" id="btnReset">Reset team</button></div>
+        <h3 style="margin:0">Spelers (sleep om te rangschikken)</h3>
+        <div class="row">
+          <button class="btn small" id="btnAdd">+ Speler</button>
+          <button class="btn small danger" id="btnReset">Reset team</button>
+        </div>
       </div>
       <div id="playerList" class="list"></div>
     </div>
-    <div class="row"><button class="btn" id="btnSaveSetup">Opslaan & Naar Live</button></div>
+    <div class="row"><button class="btn" id="btnSaveSetup">Opslaan & naar Live</button></div>
   </section>
 
+  <!-- TAB: Live -->
   <section id="tab-live" class="card hidden">
-    <h2>Live</h2>
+    <h2>Live wedstrijd</h2>
     <div class="timer">
       <div class="big" id="clock">10:00</div>
       <div class="pill" id="lblQuarter">Kwart 1 / 4</div>
       <button class="btn" id="btnStart">▶ Start</button>
-      <button class="btn secondary" id="btnPause">⏸︎ Pauze</button>
+      <button class="btn secondary" id="btnPause">⏸ Pauze</button>
     </div>
-    <!-- Wedstrijdprogress in 4 kwarten -->
-<div class="match-progress" id="matchProgress">
-  <div class="fill" id="matchFill"></div>
-  <div class="q-marker" id="quarterMarker" title="Voortgang huidig kwart"></div>
-</div>
 
-    <!-- Prominente wissel indicatie -->
-<div class="card" id="liveSwapCard">
-  <h3 style="margin:0 0 8px">Wissel bij 05:00</h3>
-  <div class="row" style="gap:12px;flex-wrap:wrap">
-    <div class="pill"><strong>UIT:</strong> <span id="liveSwapOut">—</span></div>
-    <div class="pill"><strong>IN:</strong> <span id="liveSwapIn">—</span></div>
-  </div>
-</div>
+    <div class="match-progress" id="matchProgress">
+      <div class="fill" id="matchFill"></div>
+      <div class="q-marker" id="quarterMarker"></div>
+    </div>
 
-    <div class="card"><div class="row"><div class="pill"><strong>Keeper:</strong> <span id="liveKeeper">—</span></div><div class="pill"><strong>Veld:</strong> <span id="liveField">—</span></div><div class="pill"><strong>Bank:</strong> <span id="liveBench">—</span></div></div></div>
-    <table class="table" id="scheduleTable"><thead><tr><th>Q•Slot</th><th>Tijd</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
+    <div class="card" id="liveSwapCard">
+      <h3>Wissel bij 05:00</h3>
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <div class="pill"><strong>UIT:</strong> <span id="liveSwapOut">—</span></div>
+        <div class="pill"><strong>IN:</strong> <span id="liveSwapIn">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pill"><strong>Keeper:</strong> <span id="liveKeeper">—</span></div>
+        <div class="pill"><strong>Veld:</strong> <span id="liveField">—</span></div>
+        <div class="pill"><strong>Bank:</strong> <span id="liveBench">—</span></div>
+      </div>
+    </div>
+
+    <table class="table" id="scheduleTable">
+      <thead><tr><th>Kwart•Slot</th><th>Tijd</th><th>Veld</th><th>Bank</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </section>
 
+  <!-- TAB: Snelle wijzigingen -->
   <section id="tab-quick" class="card hidden">
     <h2>Snelle wijzigingen</h2>
-    <div class="card"><div class="row"><div class="grid2" style="width:100%">
+
+    <div class="grid2 card">
       <div><label>Actieve spelers</label><div id="quickActive" class="list"></div></div>
       <div><label>Formatie aanpassen</label><select id="quickFormation"></select></div>
-    </div></div></div>
+    </div>
+
     <div><label>Keeper wijzigen (volgens modus)</label><div id="quickKeeperAssign" class="row"></div></div>
+
     <div class="card" id="quickManualSwap">
-  <h3 style="margin:0 0 8px">Huidig kwart – wissel aanpassen</h3>
-  <div class="grid2" style="width:100%">
-    <div>
-      <label>Uit (van veld)</label>
-      <select id="manualOut"></select>
+      <h3>Huidig kwart – wissel aanpassen</h3>
+      <div class="grid2" style="width:100%">
+        <div class="col-field"><label>Uit (van veld)</label><select id="manualOut"></select></div>
+        <div class="col-bench"><label>In (van bank)</label><select id="manualIn"></select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="btnApplyManualSwap">Pas wissel aan</button>
+      </div>
+      <small class="muted">Bij aanpassen wordt de hele wedstrijd opnieuw herberekend met gelijke speelminuten.</small>
     </div>
-    <div>
-      <label>In (van bank)</label>
-      <select id="manualIn"></select>
+
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btnQuickRecalc">Herberekenen</button>
+      <button class="btn secondary" id="btnQuickToLive">Naar Live</button>
     </div>
-  </div>
-  <div class="row" style="margin-top:8px">
-    <button class="btn" id="btnApplyManualSwap">Pas wissel aan</button>
-  </div>
-  <small class="muted">Dit wijzigt de wissel van dit kwart (05:00); minutenverdeling wordt vanaf dit kwart opnieuw berekend.</small>
-</div>
-    <div class="row" style="margin-top:8px"><button class="btn" id="btnQuickRecalc">Herberekenen</button><button class="btn secondary" id="btnQuickToLive">Naar Live</button></div>
   </section>
 
+  <!-- TAB: Verdeling -->
   <section id="tab-dist" class="card hidden">
     <h2>Verdeling</h2>
     <div class="card">
-      <h3 style="margin-top:0">Geplande wissels (alle kwarten)</h3>
-      <table class="table" id="distSwaps"><thead><tr><th>Q•Slot</th><th>Tijd</th><th>Keeper</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
+      <h3>Geplande wissels (alle kwarten)</h3>
+      <table class="table" id="distSwaps"><thead><tr><th>Kwart•Slot</th><th>Tijd</th><th>Keeper</th><th>Veld</th><th>Bank</th></tr></thead><tbody></tbody></table>
     </div>
     <div class="card">
-      <h3 style="margin-top:0">Geplande speelminuten per speler</h3>
+      <h3>Speelminuten per speler</h3>
       <table class="table" id="distMinutes"><thead><tr><th>Speler</th><th>Minuten</th><th>Relatief</th></tr></thead><tbody></tbody></table>
     </div>
   </section>
 </div>
 
+<!-- Overlay -->
 <div class="overlay" id="swapOverlay">
   <div class="panel">
     <h2>Wisselmoment</h2>
@@ -197,31 +236,82 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
   </div>
 </div>
 
+<!-- SCRIPT -->
 <script>
-const storeKey='wisselplanner.v13';
-const POS=['Aanvaller','Middenvelder','Verdediger'];
-const DEFAULT_ORDER=['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
-let state={team:'De Esch O9',formation:5,players:[],keepersMode:4,keeperByQuarter:[],q:1,viewQ:1,schedule:[],plannedMinutes:{},running:false,tStart:null,elapsedMs:0,quarterMs:600000,swapAtMs:300000,swappedThisQuarter:false};
+/* --------------------------------------------------------
+   JavaScript: logica, herberekening, timers, wissels
+   (zelfde als jouw werkende versie met visuele updates)
+-------------------------------------------------------- */
 
-function uid(){return Math.random().toString(36).slice(2,9)}
-function save(){localStorage.setItem(storeKey,JSON.stringify(state))}
-function load(){const raw=localStorage.getItem(storeKey); if(raw){try{state=JSON.parse(raw)}catch(e){}}}
-function ensureDefaults(){
-  if(!state.players||!state.players.length){state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name:n,pos:POS[i%3],present:true,benchCd:0}))}
-  if(!state.keeperByQuarter||state.keeperByQuarter.length!==4){
-    // default 4 keepers Q1..Q4 different if kan
-    const ps=state.players.map(p=>p.id);
-    state.keeperByQuarter=[ps[0]||null,ps[1]||ps[0]||null,ps[2]||ps[0]||null,ps[3]||ps[0]||null];
-  }
-  if(!state.q) state.q=1;
-  if(!state.viewQ) state.viewQ=1;
+// ... [👉 Plaats hier jouw bestaande JS-blok uit je vorige versie 
+// (vanaf const storeKey = ... tot einde) zonder aanpassingen] ...
+
+<script>
+/* --------------------------------------------------------
+   Wisselplanner – De Esch (donkerblauw/geel)
+   Volledige logica: opslag, planning, timers, overlays,
+   Snelle wijzigingen (met "Pas wissel aan"), en verdeling.
+-------------------------------------------------------- */
+
+const storeKey = 'wisselplanner.v14';
+const POS = ['Aanvaller','Middenvelder','Verdediger'];
+const DEFAULT_ORDER = ['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
+
+let state = {
+  team: 'De Esch O9',
+  formation: 5,
+  players: [],
+  keepersMode: 4,
+  keeperByQuarter: [],    // length 4: speler-id per kwart
+  q: 1,                   // huidig kwart (1..4)
+  schedule: [],           // 8 slots (2 per kwart)
+  plannedMinutes: {},     // id -> minuten
+  running: false,
+  elapsedMs: 0,           // tijd binnen huidig kwart
+  quarterMs: 10 * 60 * 1000, // 10:00
+  swapAtMs: 5 * 60 * 1000,   // wissel op 05:00
+  swappedThisQuarter: false  // of de 05:00 wissel al getoond is
+};
+
+/* ========== STORAGE ========== */
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function save(){ localStorage.setItem(storeKey, JSON.stringify(state)); }
+function load(){
+  const raw = localStorage.getItem(storeKey);
+  if(!raw) return;
+  try { state = JSON.parse(raw); } catch(e){}
 }
-function presentPlayers(){return state.players.filter(p=>p.present)}
-function nameBy(id){const p=state.players.find(x=>x.id===id); return p?p.name:'—'}
-function playerBy(id){return state.players.find(x=>x.id===id)}
-function rankIndex(id){return state.players.findIndex(p=>p.id===id)}
+
+/* ========== BASIS / DEFAULTS ========== */
+function ensureDefaults(){
+  if(!Array.isArray(state.players) || state.players.length === 0){
+    state.players = DEFAULT_ORDER.map((n,i)=>({
+      id: uid(),
+      name: n,
+      pos: POS[i % 3],
+      present: true,
+      benchCd: 0      // cooldown: 1 = zat net bank; moet nu spelen
+    }));
+  }
+  if(!Array.isArray(state.keeperByQuarter) || state.keeperByQuarter.length !== 4){
+    const ps = state.players.map(p=>p.id);
+    state.keeperByQuarter = [
+      ps[0]||null, ps[1]||ps[0]||null, ps[2]||ps[0]||null, ps[3]||ps[0]||null
+    ];
+  }
+  if(!state.q) state.q = 1;
+}
+
+function presentPlayers(){ return state.players.filter(p=>p.present); }
+function playerBy(id){ return state.players.find(p=>p.id===id); }
+function nameBy(id){ const p = playerBy(id); return p ? p.name : '—'; }
+function rankIndex(id){ return state.players.findIndex(p=>p.id===id); }
+function keeperFor(q){ return state.keeperByQuarter[q-1]; }
+
+/* Benchwacht: twee “beste/slechtste” niet tegelijk op bank
+   Regels: alle paren op de bank verschillen minimaal 3 rangen */
 function violatesQualityGap(arr){
-  if(!arr||arr.length<2) return false;
+  if(!arr || arr.length < 2) return false;
   for(let i=0;i<arr.length;i++){
     for(let j=i+1;j<arr.length;j++){
       if(Math.abs(rankIndex(arr[i]) - rankIndex(arr[j])) < 3) return true;
@@ -229,81 +319,113 @@ function violatesQualityGap(arr){
   }
   return false;
 }
-function keeperFor(q){return state.keeperByQuarter[q-1]}
 
-function keeperAssignUI(containerId,prefix){
-  const row=document.getElementById(containerId); row.innerHTML='';
-  const ps=presentPlayers(); const opts=ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  if(state.keepersMode===1){
-    const id=`${prefix}-all`; row.innerHTML=`<select id="${id}">${opts}</select>`; (document.getElementById(id)||{}).value=state.keeperByQuarter[0];
-  }else if(state.keepersMode===2){
-    row.innerHTML=`<div class="grid2" style="width:100%">
-      <div><label>1e helft</label><select id="${prefix}-h1">${opts}</select></div>
-      <div><label>2e helft</label><select id="${prefix}-h2">${opts}</select></div>
-    </div>`;
-    document.getElementById(`${prefix}-h1`).value=state.keeperByQuarter[0];
-    document.getElementById(`${prefix}-h2`).value=state.keeperByQuarter[2]||ps[1]?.id;
+/* ========== KEEPER UI (setup & snelle wijzigingen) ========== */
+function keeperAssignUI(containerId, prefix){
+  const row = document.getElementById(containerId);
+  row.innerHTML = '';
+  const ps = presentPlayers();
+  const opts = ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+
+  if(state.keepersMode === 1){
+    const id = `${prefix}-all`;
+    row.innerHTML = `<select id="${id}">${opts}</select>`;
+    const el = document.getElementById(id);
+    if(el) el.value = state.keeperByQuarter[0] || ps[0]?.id || '';
+  }else if(state.keepersMode === 2){
+    row.innerHTML = `
+      <div class="grid2" style="width:100%">
+        <div><label>1e helft</label><select id="${prefix}-h1">${opts}</select></div>
+        <div><label>2e helft</label><select id="${prefix}-h2">${opts}</select></div>
+      </div>`;
+    const a = document.getElementById(`${prefix}-h1`);
+    const b = document.getElementById(`${prefix}-h2`);
+    if(a) a.value = state.keeperByQuarter[0] || ps[0]?.id || '';
+    if(b) b.value = state.keeperByQuarter[2] || ps[1]?.id || ps[0]?.id || '';
   }else{
-    const ids=[`${prefix}-q1`,`${prefix}-q2`,`${prefix}-q3`,`${prefix}-q4`];
-    row.innerHTML=`<div class="grid2" style="width:100%">${ids.map((id,i)=>`<div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>`).join('')}</div>`;
-    ids.forEach((id,i)=>{document.getElementById(id).value=state.keeperByQuarter[i]});
+    const ids = [`${prefix}-q1`,`${prefix}-q2`,`${prefix}-q3`,`${prefix}-q4`];
+    row.innerHTML = `
+      <div class="grid2" style="width:100%">
+        ${ids.map((id,i)=>`
+          <div><label>Kwart ${i+1}</label><select id="${id}">${opts}</select></div>
+        `).join('')}
+      </div>`;
+    ids.forEach((id,i)=>{
+      const el = document.getElementById(id);
+      if(el) el.value = state.keeperByQuarter[i] || ps[i]?.id || ps[0]?.id || '';
+    });
   }
 }
 function readKeeperAssign(prefix){
-  const ps=presentPlayers(); const val=id=>{const el=document.getElementById(id); return el?el.value:(ps[0]?.id||null)};
-  if(state.keepersMode===1){const k=val(`${prefix}-all`); state.keeperByQuarter=[k,k,k,k];}
-  else if(state.keepersMode===2){const a=val(`${prefix}-h1`),b=val(`${prefix}-h2`); state.keeperByQuarter=[a,a,b,b];}
-  else{state.keeperByQuarter=[val(`${prefix}-q1`),val(`${prefix}-q2`),val(`${prefix}-q3`),val(`${prefix}-q4`)];}
+  const ps = presentPlayers();
+  const val = id => {
+    const el = document.getElementById(id);
+    return el ? el.value : (ps[0]?.id || null);
+  };
+  if(state.keepersMode === 1){
+    const k = val(`${prefix}-all`);
+    state.keeperByQuarter = [k,k,k,k];
+  }else if(state.keepersMode === 2){
+    const a = val(`${prefix}-h1`);
+    const b = val(`${prefix}-h2`);
+    state.keeperByQuarter = [a,a,b,b];
+  }else{
+    state.keeperByQuarter = [
+      val(`${prefix}-q1`), val(`${prefix}-q2`),
+      val(`${prefix}-q3`), val(`${prefix}-q4`)
+    ];
+  }
 }
 
-/* ===== FAIR SCHEDULER with 1-slot cooldown ===== */
-function recomputeAll(){
-  state.schedule=[]; state.plannedMinutes={};
-  state.players.forEach(p=>{p.benchCd = p.benchCd||0; state.plannedMinutes[p.id]=0;});
-  let prevField = null;
-  for(let q=1;q<=4;q++){
-    const k=keeperFor(q);
-    // SLOT 1
-    const s1=buildSlot(q,1,k,prevField);
-    applySlotMinutes(s1);
-    state.schedule.push(s1);
-    // SLOT 2
-    const s2=buildSlot(q,2,k,s1.field);
-    applySlotMinutes(s2);
-    state.schedule.push(s2);
-    // After quarter, previous field is s2.field
-    prevField = s2.field.slice();
-  }
-  state.viewQ=state.q; state.swappedThisQuarter=false; state.elapsedMs=0; save();
+/* ========== PLANNER (eerlijk, met 1-slot cooldown) ========== */
+function applySlotMinutes(slot){
+  // minuten bij veld + keeper
+  [...slot.field, slot.keeper].forEach(id=>{
+    state.plannedMinutes[id] = (state.plannedMinutes[id] || 0) + 5;
+  });
+  // cooldown bijwerken
+  presentPlayers().forEach(p=>{
+    if(p.id === slot.keeper) return;       // keeper telt apart
+    p.benchCd = slot.bench.includes(p.id) ? 1 : 0;
+  });
 }
-function buildSlot(q,slot,k,prevField){
+
+function buildSlot(q, slot, k, prevField){
   const all = presentPlayers().map(p=>p.id).filter(id=>id!==k);
-  // players who were benched in previous slot must play now
-  const mustPlay = all.filter(id=>playerBy(id).benchCd>0);
+
+  // Moeten spelen (zaten net bank)
+  const mustPlay = all.filter(id => playerBy(id).benchCd > 0);
   let field = mustPlay.slice();
-  const remainingSeats = Math.max(0, state.formation - field.length);
-  const needFrom = all.filter(id=>!field.includes(id)).sort((a,b)=>{
-    const da=state.plannedMinutes[a]||0, db=state.plannedMinutes[b]||0;
-    if(da!==db) return da-db;
-    return rankIndex(a)-rankIndex(b);
-  }).slice(0,remainingSeats);
-  field = field.concat(needFrom);
+
+  // Vul veld aan, minst gespeelde spelers eerst, gelijke stand -> betere (lagere index) eerst
+  const need = Math.max(0, state.formation - field.length);
+  const add = all
+    .filter(id=>!field.includes(id))
+    .sort((a,b)=>{
+      const da = (state.plannedMinutes[a]||0) - (state.plannedMinutes[b]||0);
+      if(da !== 0) return da;
+      return rankIndex(a) - rankIndex(b);
+    })
+    .slice(0, need);
+  field = field.concat(add);
+
   let bench = all.filter(id=>!field.includes(id));
 
-  // Enforce quality gap on bench: any pair must differ >= 3 ranks
+  // Handhaaf quality-gap op de bank
   if(violatesQualityGap(bench)){
-    // try to swap a bench player with a field player (that is not mustPlay)
-    const fieldSwapCandidates = field.filter(id=>!mustPlay.includes(id)).sort((a,b)=>{
-      // prefer swapping out the most-played field player
-      const da=state.plannedMinutes[b]-state.plannedMinutes[a];
-      if(da!==0) return da;
-      return rankIndex(b)-rankIndex(a);
-    });
-    // iterate bench members and swap with best field candidate that fixes violation
+    const fieldSwapCandidates = field
+      .filter(id=>!mustPlay.includes(id))
+      .sort((a,b)=>{
+        // eerst diegene met al veel minuten
+        const da = (state.plannedMinutes[b]||0) - (state.plannedMinutes[a]||0);
+        if(da !== 0) return da;
+        return rankIndex(b) - rankIndex(a);
+      });
+
     outer: for(const bId of bench.slice()){
       for(const fId of fieldSwapCandidates){
-        const newField = field.map(x=>x===fId?bId:x);
-        const newBench = bench.map(x=>x===bId?fId:x);
+        const newField = field.map(x => x===fId ? bId : x);
+        const newBench = bench.map(x => x===bId ? fId : x);
         if(!violatesQualityGap(newBench)){
           field = newField; bench = newBench;
           break outer;
@@ -312,126 +434,136 @@ function buildSlot(q,slot,k,prevField){
     }
   }
 
-  // compute swap lists compared to prevField for readability
-  let out=[],inn=[];
+  // leesbaarheid: bereken in/out t.o.v. vorige veldbezetting
+  let out=[], inn=[];
   if(prevField){
     out = prevField.filter(id=>!field.includes(id));
     inn = field.filter(id=>!prevField.includes(id));
   }
-  return {q,slot,start:slot===1?0:5,end:slot===1?5:10,keeper:k,field:field.slice(),bench:bench.slice(),out,inn};
-}
-function applySlotMinutes(r){
-  // minutes to field + keeper
-  [...r.field, r.keeper].forEach(id=>{state.plannedMinutes[id]=(state.plannedMinutes[id]||0)+5;});
-  // update cooldowns: benched -> 1, field -> 0
-  presentPlayers().forEach(p=>{
-    if(p.id===r.keeper) return;
-    if(r.bench.includes(p.id)) p.benchCd = 1; else p.benchCd = 0;
-  });
+
+  return {
+    q, slot,
+    start: (slot===1?0:5),
+    end:   (slot===1?5:10),
+    keeper: k,
+    field: field.slice(),
+    bench: bench.slice(),
+    out, inn
+  };
 }
 
- 
-// Touch-friendly sortable voor iOS (werkt ook met muis)
+function recomputeAll(){
+  state.schedule = [];
+  state.plannedMinutes = {};
+  state.players.forEach(p => { p.benchCd = p.benchCd || 0; state.plannedMinutes[p.id] = 0; });
+
+  let prevField = null;
+  for(let q=1;q<=4;q++){
+    const k = keeperFor(q);
+    const s1 = buildSlot(q,1,k,prevField);
+    applySlotMinutes(s1);
+    state.schedule.push(s1);
+
+    const s2 = buildSlot(q,2,k,s1.field);
+    applySlotMinutes(s2);
+    state.schedule.push(s2);
+
+    prevField = s2.field.slice();
+  }
+
+  state.swappedThisQuarter = false;
+  state.elapsedMs = 0;
+  save();
+}
+
+/* Herbereken minuten tot index (excl. latere slots) */
+function recomputeMinutesUpToIndex(lastIdx){
+  state.plannedMinutes = {};
+  state.players.forEach(p => state.plannedMinutes[p.id] = 0);
+  presentPlayers().forEach(p => p.benchCd = 0);
+
+  for(let i=0;i<=lastIdx;i++){
+    applySlotMinutes(state.schedule[i]);
+  }
+}
+
+/* Bouw schema opnieuw vanaf kwart startQ; kan slot-2 van startQ forceren */
+function rebuildScheduleFromQuarter(startQ, forcedS2){
+  const idxS1 = (startQ-1)*2;
+  const idxS2 = idxS1 + 1;
+
+  // tel alles vóór startQ opnieuw (t/m vorige kwart)
+  recomputeMinutesUpToIndex(idxS1 - 1);
+
+  const kStart = keeperFor(startQ);
+
+  // herbouw/gebruik slot-1
+  let s1 = state.schedule[idxS1];
+  if(!s1 || s1.q !== startQ || s1.slot !== 1){
+    const prevField = (idxS1-1 >= 0) ? state.schedule[idxS1-1].field.slice() : null;
+    s1 = buildSlot(startQ, 1, kStart, prevField);
+  }
+  state.schedule[idxS1] = s1;
+  applySlotMinutes(s1);
+
+  // slot-2: forced of herbouw
+  let s2 = forcedS2 ? { ...forcedS2, q:startQ, slot:2, keeper:kStart } : buildSlot(startQ, 2, kStart, s1.field);
+  state.schedule[idxS2] = s2;
+  applySlotMinutes(s2);
+
+  // rest van de wedstrijd doorrekenen
+  let prevField = s2.field.slice();
+  for(let q = startQ+1; q<=4; q++){
+    const k = keeperFor(q);
+    const i1 = (q-1)*2, i2 = i1+1;
+    const ns1 = buildSlot(q,1,k,prevField);
+    state.schedule[i1] = ns1; applySlotMinutes(ns1);
+    const ns2 = buildSlot(q,2,k,ns1.field);
+    state.schedule[i2] = ns2; applySlotMinutes(ns2);
+    prevField = ns2.field.slice();
+  }
+  save();
+}
+
+/* ========== TOUCH SORTABLE (iOS/Android/Desktop) ========== */
 function makeSortable(container){
-  let dragged=null, placeholder=null;
+  let dragged = null, placeholder = null;
 
-  const onPointerMove = (e)=>{
+  const onMove = (e)=>{
     if(!dragged) return;
     e.preventDefault();
     const y = (e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0);
     const items = [...container.querySelectorAll('.player')].filter(el=>el!==dragged);
-    let target=null;
+    let target = null;
     for(const el of items){
-      const r=el.getBoundingClientRect();
-      if(y>r.top && y<r.bottom){ target=el; break; }
+      const r = el.getBoundingClientRect();
+      if(y > r.top && y < r.bottom){ target = el; break; }
     }
     if(target && placeholder){
-      const r=target.getBoundingClientRect();
-      if(y < r.top + r.height/2){
-        container.insertBefore(placeholder, target);
-      }else{
-        container.insertBefore(placeholder, target.nextSibling);
-      }
+      const r = target.getBoundingClientRect();
+      if(y < r.top + r.height/2) container.insertBefore(placeholder, target);
+      else container.insertBefore(placeholder, target.nextSibling);
     }
   };
 
-  const onPointerUp = ()=>{
+  const onUp = ()=>{
     if(!dragged) return;
     dragged.classList.remove('dragging');
     if(placeholder && placeholder.parentNode){
       placeholder.parentNode.insertBefore(dragged, placeholder);
       placeholder.remove();
     }
-    placeholder=null;
+    placeholder = null;
 
-    // state.players volgorde updaten op basis van DOM
-    const ids=[...container.querySelectorAll('.player')].map(el=>el.dataset.id);
+    // volgorde -> state.players
+    const ids = [...container.querySelectorAll('.player')].map(el=>el.dataset.id);
     state.players = ids.map(id => state.players.find(p=>p.id===id));
     save();
 
-    window.removeEventListener('pointermove', onPointerMove, {passive:false});
-    window.removeEventListener('pointerup', onPointerUp);
-    dragged=null;
-  };
-
-  // pointerstart op handvat (☰) of hele kaart
-  container.querySelectorAll('.player').forEach(el=>{
-    const handle = el.querySelector('.drag') || el;
-    handle.addEventListener('pointerdown', (e)=>{
-      dragged = el;
-      dragged.classList.add('dragging');
-      placeholder = document.createElement('div');
-      placeholder.className='placeholder';
-      placeholder.style.height = el.getBoundingClientRect().height + 'px';
-      container.insertBefore(placeholder, el.nextSibling);
-      e.preventDefault();
-      window.addEventListener('pointermove', onPointerMove, {passive:false});
-      window.addEventListener('pointerup', onPointerUp);
-    }, {passive:false});
-  });
-}
-// Touch-friendly sortable voor iOS/Android/desktop (Pointer Events)
-function makeSortable(container){
-  let dragged=null, placeholder=null;
-
-  const onPointerMove = (e)=>{
-    if(!dragged) return;
-    e.preventDefault();
-    const y = (e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0);
-    const items = [...container.querySelectorAll('.player')].filter(el=>el!==dragged);
-    let target=null;
-    for(const el of items){
-      const r=el.getBoundingClientRect();
-      if(y>r.top && y<r.bottom){ target=el; break; }
-    }
-    if(target && placeholder){
-      const r=target.getBoundingClientRect();
-      if(y < r.top + r.height/2){
-        container.insertBefore(placeholder, target);
-      }else{
-        container.insertBefore(placeholder, target.nextSibling);
-      }
-    }
-  };
-
-  const onPointerUp = ()=>{
-    if(!dragged) return;
-    dragged.classList.remove('dragging');
-    if(placeholder && placeholder.parentNode){
-      placeholder.parentNode.insertBefore(dragged, placeholder);
-      placeholder.remove();
-    }
-    placeholder=null;
-
-    // volgorde uit DOM -> state.players
-    const ids=[...container.querySelectorAll('.player')].map(el=>el.dataset.id);
-    state.players = ids.map(id => state.players.find(p=>p.id===id));
-    save();
-
-    window.removeEventListener('pointermove', onPointerMove, {passive:false});
-    window.removeEventListener('pointerup', onPointerUp);
-    window.removeEventListener('pointercancel', onPointerUp); // extra robuust
-    dragged=null;
+    window.removeEventListener('pointermove', onMove, {passive:false});
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    dragged = null;
   };
 
   container.querySelectorAll('.player').forEach(el=>{
@@ -440,18 +572,18 @@ function makeSortable(container){
       dragged = el;
       dragged.classList.add('dragging');
       placeholder = document.createElement('div');
-      placeholder.className='placeholder';
+      placeholder.className = 'placeholder';
       placeholder.style.height = el.getBoundingClientRect().height + 'px';
       container.insertBefore(placeholder, el.nextSibling);
       e.preventDefault();
-      window.addEventListener('pointermove', onPointerMove, {passive:false});
-      window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('pointermove', onMove, {passive:false});
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
     }, {passive:false});
   });
 }
 
-/* ===== RENDER ===== */
+/* ========== RENDER ======== */
 function renderPlayersList(){
   const list = document.getElementById('playerList');
   list.innerHTML = '';
@@ -459,52 +591,37 @@ function renderPlayersList(){
   state.players.forEach(p=>{
     const el = document.createElement('div');
     el.className = 'player';
-    el.dataset.id = p.id;              // <-- GEEN el.draggable meer
-
+    el.dataset.id = p.id;
     el.innerHTML = `
       <div class="drag">☰</div>
       <div class="name" contenteditable="true">${p.name}</div>
-      <select class="pos">
-        ${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}
-      </select>
+      <select class="pos">${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select>
       <div class="present"><input type="checkbox" ${p.present?'checked':''}></div>
       <div class="del"><button class="btn small danger">🗑</button></div>
     `;
-
-    // events (naam, positie, aanwezig, verwijderen)
-    el.querySelector('.name').addEventListener('input', e=>{
-      p.name = e.target.textContent.trim(); save();
-    });
-    el.querySelector('.pos').addEventListener('change', e=>{
-      p.pos = e.target.value; save();
-    });
-    el.querySelector('.present input').addEventListener('change', e=>{
-      p.present = e.target.checked; save();
-    });
+    el.querySelector('.name').addEventListener('input', e=>{ p.name = e.target.textContent.trim(); save(); });
+    el.querySelector('.pos').addEventListener('change', e=>{ p.pos = e.target.value; save(); });
+    el.querySelector('.present input').addEventListener('change', e=>{ p.present = e.target.checked; save(); });
     el.querySelector('.del button').addEventListener('click', ()=>{
       state.players = state.players.filter(x=>x.id!==p.id);
       save(); renderPlayersList();
     });
-
-    // ⛔️ Verwijder ALLE HTML5 drag events (dragstart/dragover/dragleave/drop)
-    // die je in je oude versie had — we gebruiken Pointer Events.
-
     list.appendChild(el);
   });
 
-  // ⬇️ slechts 1x aanroepen (buiten de loop!)
   makeSortable(list);
 }
+
 function renderSetup(){
-  document.getElementById('teamName').value=state.team;
-  document.getElementById('formation').value=String(state.formation);
-  document.getElementById('keepersMode').value=String(state.keepersMode);
+  document.getElementById('teamName').value = state.team;
+  document.getElementById('formation').value = String(state.formation);
+  document.getElementById('keepersMode').value = String(state.keepersMode);
   keeperAssignUI('keeperAssignRow','keepk');
   renderPlayersList();
 }
+
 function renderLive(){
   document.getElementById('lblQuarter').textContent = `Kwart ${state.q} / 4`;
-  // we tonen ALLEEN het actuele kwart
   const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
   const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
 
@@ -512,174 +629,125 @@ function renderLive(){
   document.getElementById('liveField').textContent  = (r1?.field||[]).map(nameBy).join(', ') || '—';
   document.getElementById('liveBench').textContent  = (r1?.bench||[]).map(nameBy).join(', ') || '—';
 
-  // Prominente wissel (05:00)
   document.getElementById('liveSwapOut').textContent = (r2?.out||[]).map(nameBy).join(', ') || '—';
   document.getElementById('liveSwapIn').textContent  = (r2?.inn||[]).map(nameBy).join(', ') || '—';
 
-  const tb = document.querySelector('#scheduleTable tbody'); tb.innerHTML='';
+  const tb = document.querySelector('#scheduleTable tbody'); 
+  tb.innerHTML = '';
   [r1,r2].filter(Boolean).forEach(r=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${r.q}•${r.slot}</td>
-                    <td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td>
-                    <td>${r.field.map(nameBy).join(', ')}</td>
-                    <td>${r.bench.map(nameBy).join(', ')}</td>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.q}•${r.slot}</td>
+      <td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td>
+      <td>${r.field.map(nameBy).join(', ')}</td>
+      <td>${r.bench.map(nameBy).join(', ')}</td>`;
     tb.appendChild(tr);
   });
+
   updateTimerUI();
 }
 
 function renderQuick(){
-  const cont=document.getElementById('quickActive'); cont.innerHTML='';
-  state.players.forEach(p=>{const line=document.createElement('div'); line.className='player'; line.innerHTML=`<div class="name" style="flex:1">${p.name}</div><div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`; line.querySelector('input').addEventListener('change',e=>{p.present=e.target.checked; save();}); cont.appendChild(line);});
-  const qf=document.getElementById('quickFormation'); qf.innerHTML=['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join(''); qf.value=String(state.formation);
+  // Actief (aan/uit)
+  const cont = document.getElementById('quickActive');
+  cont.innerHTML = '';
+  state.players.forEach(p=>{
+    const line = document.createElement('div');
+    line.className = 'player';
+    line.innerHTML = `
+      <div class="name" style="flex:1">${p.name}</div>
+      <div class="present"><input type="checkbox" ${p.present?'checked':''}></div>`;
+    line.querySelector('input').addEventListener('change', e=>{
+      p.present = e.target.checked; save();
+    });
+    cont.appendChild(line);
+  });
+
+  // formatie
+  const qf = document.getElementById('quickFormation');
+  qf.innerHTML = ['4','5','6'].map(v=>`<option value="${v}">${v}</option>`).join('');
+  qf.value = String(state.formation);
+
   keeperAssignUI('quickKeeperAssign','quickk');
   populateManualSwapUI();
 }
+
 function populateManualSwapUI(){
   const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
   const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
   const outSel = document.getElementById('manualOut');
   const inSel  = document.getElementById('manualIn');
-  if(!outSel || !inSel || !r1 || !r2){ return; }
+  if(!outSel || !inSel || !r1 || !r2) return;
 
   outSel.innerHTML = r1.field.map(id=>`<option value="${id}">${nameBy(id)}</option>`).join('');
   inSel.innerHTML  = r1.bench.map(id=>`<option value="${id}">${nameBy(id)}</option>`).join('');
 
-  // default: eerste uit/ in volgens de geplande swap (als er precies 1 is)
   const defOut = (r2.out && r2.out[0]) || r1.field[0];
   const defIn  = (r2.inn && r2.inn[0]) || r1.bench[0];
-  outSel.value = defOut || '';
-  inSel.value  = defIn  || '';
+  if(defOut) outSel.value = defOut;
+  if(defIn)  inSel.value  = defIn;
 }
 
-// Tel geplande minuten opnieuw tot en met een gegeven index in state.schedule
-function recomputeMinutesUpToIndex(endIdx){
-  state.plannedMinutes = {};
-  state.players.forEach(p => state.plannedMinutes[p.id] = 0);
-  presentPlayers().forEach(p => p.benchCd = 0); // reset cooldowns
-
-  for(let i=0; i<=endIdx; i++){
-    applySlotMinutes(state.schedule[i]);
-  }
-}
-
-// Bouw het schema opnieuw vanaf kwart q (1..4), met mogelijkheid om slot-2 van q te forceren
-function rebuildScheduleFromQuarter(startQ, forcedS2ForStartQ){
-  // 1) Vind indices in het schema
-  const idxS1 = (startQ-1)*2;      // slot-1 index
-  const idxS2 = (startQ-1)*2 + 1;  // slot-2 index
-
-  // 2) Tel minuten van alles vóór startQ opnieuw
-  recomputeMinutesUpToIndex(idxS1 - 1);  // tot en met vorige kwart
-
-  // 3) Begin met de veldbezetting die slot-1 van startQ bepaalt
-  const kStart = keeperFor(startQ);
-  // Pak de bestaande slot-1 als basis (zodat jouw geplande s1 blijft staan),
-  // maar als je liever volledig herbouwt, vervang de volgende regel door buildSlot(...)
-  let s1 = {...state.schedule[idxS1]};
-  if (!s1 || s1.q !== startQ || s1.slot !== 1){
-    // failsafe: herbouw slot-1 als die niet klopt
-    const prevField = (idxS1-1 >= 0) ? state.schedule[idxS1-1].field.slice() : null;
-    s1 = buildSlot(startQ, 1, kStart, prevField);
-  }
-  state.schedule[idxS1] = s1;
-  applySlotMinutes(s1);
-
-  // 4) Slot-2 van startQ: gebruik de geforceerde versie als die is meegegeven, anders herbouw
-  let s2;
-  if (forcedS2ForStartQ){
-    s2 = {...forcedS2ForStartQ, q:startQ, slot:2, keeper:kStart};
-  } else {
-    s2 = buildSlot(startQ, 2, kStart, s1.field);
-  }
-  state.schedule[idxS2] = s2;
-  applySlotMinutes(s2);
-
-  // 5) Alle latere kwarten opnieuw doorrekenen op basis van de net ontstane situatie
-  let prevField = s2.field.slice();
-  for (let q = startQ + 1; q <= 4; q++){
-    const k = keeperFor(q);
-    const i1 = (q-1)*2, i2 = i1+1;
-    const ns1 = buildSlot(q, 1, k, prevField);
-    state.schedule[i1] = ns1; applySlotMinutes(ns1);
-    const ns2 = buildSlot(q, 2, k, ns1.field);
-    state.schedule[i2] = ns2; applySlotMinutes(ns2);
-    prevField = ns2.field.slice();
-  }
-
-  save();
-}
-  
-function applyManualSwapForCurrentQuarter(){
-  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
-  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
-  if(!r1 || !r2) return;
-
-  const outId = document.getElementById('manualOut').value;
-  const inId  = document.getElementById('manualIn').value;
-  if(!outId || !inId || outId===inId) return;
-
-  // Bouw slot-2 veld op basis van slot-1 met de handmatige swap
-  const newField = r1.field.map(id => id===outId ? inId : id);
-  const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
-  const newBench = all.filter(id=>!newField.includes(id));
-
-  // Geforceerde s2 voor het huidige kwart
-  const forcedS2 = {
-    q: state.q,
-    slot: 2,
-    start: 5, end: 10,
-    keeper: r1.keeper,
-    field: newField,
-    bench: newBench,
-    out: [outId],
-    inn: [inId]
-  };
-
-  // Rebuild vanaf huidig kwart o.b.v. forced slot-2
-  rebuildScheduleFromQuarter(state.q, forcedS2);
-
-  // UI bijwerken (beide tabbladen)
-  renderLive();
-  renderDist();
-
-  // Snelle-wijzigingen selector opnieuw vullen zodat de nieuwe realiteit zichtbaar is
-  populateManualSwapUI();
-
-  // Ter bevestiging (optioneel)
-  // alert('Wissel voor dit kwart aangepast en herverdeeld.');
-}
-
-document.getElementById('btnApplyManualSwap').addEventListener('click', applyManualSwapForCurrentQuarter);
-
-  
 function renderDist(){
-  const body=document.querySelector('#distSwaps tbody'); body.innerHTML='';
-  state.schedule.forEach(r=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.q}•${r.slot}</td><td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td><td>${nameBy(r.keeper)}</td><td>${r.field.map(nameBy).join(', ')}</td><td>${r.bench.map(nameBy).join(', ')}</td>`; body.appendChild(tr);});
-  const mins=document.querySelector('#distMinutes tbody'); mins.innerHTML=''; const rows=state.players.map(p=>({id:p.id,name:p.name,m:state.plannedMinutes[p.id]||0})).sort((a,b)=>b.m-a.m); const total=rows.reduce((s,x)=>s+x.m,0)||1; const avg=total/rows.length; rows.forEach(e=>{const tr=document.createElement('tr'); const pct=Math.min(100,(e.m/(avg||1))*100); tr.innerHTML=`<td>${e.name}</td><td>${e.m} min</td><td><div class="bar"><div style="width:${pct}%"></div></div></td>`; mins.appendChild(tr);});
+  // alle geplande wissels/velden
+  const body = document.querySelector('#distSwaps tbody');
+  body.innerHTML = '';
+  state.schedule.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.q}•${r.slot}</td>
+      <td>${String(r.start).padStart(2,'0')}-${String(r.end).padStart(2,'0')}m</td>
+      <td>${nameBy(r.keeper)}</td>
+      <td>${r.field.map(nameBy).join(', ')}</td>
+      <td>${r.bench.map(nameBy).join(', ')}</td>`;
+    body.appendChild(tr);
+  });
+
+  // minuten per speler
+  const mins = document.querySelector('#distMinutes tbody');
+  mins.innerHTML = '';
+  const rows = state.players.map(p=>({
+    id:p.id, name:p.name, m: state.plannedMinutes[p.id]||0
+  })).sort((a,b)=>b.m-a.m);
+  const total = rows.reduce((s,x)=>s+x.m,0)||1;
+  const avg = total / rows.length;
+  rows.forEach(e=>{
+    const tr = document.createElement('tr');
+    const pct = Math.min(100, (e.m/(avg||1))*100);
+    tr.innerHTML = `
+      <td>${e.name}</td>
+      <td>${e.m} min</td>
+      <td><div class="bar"><div style="width:${pct}%"></div></div></td>`;
+    mins.appendChild(tr);
+  });
 }
 
-/* ===== TIMER + OVERLAY ===== */
-function fmt(ms){const t=Math.max(0,Math.ceil((state.quarterMs-ms)/1000));const m=Math.floor(t/60);const s=String(t%60).padStart(2,'0');return `${m}:${s}`}
-function updateTimerUI(){
-  // Klok (huidig kwart)
-  document.getElementById('clock').textContent = fmt(state.elapsedMs);
+/* ========== TIMER + PROGRESS + OVERLAY ========== */
+function fmt(ms){
+  const t = Math.max(0, Math.ceil((state.quarterMs - ms)/1000));
+  const m = Math.floor(t/60);
+  const s = String(t%60).padStart(2,'0');
+  return `${m}:${s}`;
+}
 
-  // Totale voortgang (4 kwarten van 10:00)
-  const quarterMs = state.quarterMs;          // 600000
-  const totalMs   = 4 * quarterMs;            // 40:00
+function updateTimerUI(){
+  // klok
+  const clock = document.getElementById('clock');
+  if(clock) clock.textContent = fmt(state.elapsedMs);
+
+  // wedstrijdprogress (4 kwarten)
+  const quarterMs = state.quarterMs;
+  const totalMs = 4 * quarterMs;
   const totalElapsed = (state.q - 1) * quarterMs + state.elapsedMs;
 
-  // 1) vulling over de hele wedstrijd
-  const pctTotal = Math.min(100, (totalElapsed / totalMs) * 100);
+  const pctTotal = Math.min(100, (totalElapsed/totalMs)*100);
   const fill = document.getElementById('matchFill');
-  if (fill) fill.style.width = pctTotal + '%';
+  if(fill) fill.style.width = pctTotal + '%';
 
-  // 2) marker positie binnen het huidige kwart
-  const pctInQuarter = Math.min(100, (state.elapsedMs / quarterMs) * 100);   // 0..100
-  const markerLeft = (state.q - 1) * 25 + (pctInQuarter * 0.25);             // 0..100
+  const pctInQuarter = Math.min(100, (state.elapsedMs/quarterMs)*100);
+  const markerLeft = (state.q - 1) * 25 + (pctInQuarter * 0.25);
   const marker = document.getElementById('quarterMarker');
-  if (marker) marker.style.left = markerLeft + '%';
+  if(marker) marker.style.left = markerLeft + '%';
 }
 
 let tick = null;
@@ -691,21 +759,23 @@ function start(){
   tick = setInterval(()=>{
     state.elapsedMs = Date.now() - base;
 
+    // wissel overlay op 05:00
     if(!state.swappedThisQuarter && state.elapsedMs >= state.swapAtMs){
       showSwap();
       state.swappedThisQuarter = true;
     }
 
+    // kwart voorbij?
     if(state.elapsedMs >= state.quarterMs){
       state.elapsedMs = state.quarterMs;
-      pause(); // stop interval
+      pause();
 
-      // klaar met kwart → kwart ophogen en klaarzetten
       if(state.q < 4){
+        // naar volgend kwart
         state.q += 1;
         state.elapsedMs = 0;
         state.swappedThisQuarter = false;
-        renderLive(); // toon meteen het nieuwe kwart met 10:00
+        renderLive(); // direct nieuw kwart tonen
       }
       save();
       return;
@@ -721,46 +791,127 @@ function pause(){
   save();
 }
 
-function pause(){state.running=false; if(tick){clearInterval(tick); tick=null;} save();}
-function showSwap(){const r=state.schedule.find(x=>x.q===state.q && x.slot===2); const out=(r?.out||[]).map(nameBy); const inn=(r?.inn||[]).map(nameBy); document.getElementById('swapOut').innerHTML=out.map(n=>`<div class="namechip">${n}</div>`).join('')||'<div class="namechip">—</div>'; document.getElementById('swapIn').innerHTML=inn.map(n=>`<div class="namechip">${n}</div>`).join('')||'<div class="namechip">—</div>'; document.getElementById('swapOverlay').style.display='flex'; try{navigator.vibrate&&navigator.vibrate([120,80,120]);}catch(e){}}
-function hideSwap(){document.getElementById('swapOverlay').style.display='none'; try{navigator.vibrate&&navigator.vibrate([60]);}catch(e){}}
+function showSwap(){
+  const r = state.schedule.find(x=>x.q===state.q && x.slot===2);
+  const out = (r?.out||[]).map(nameBy);
+  const inn = (r?.inn||[]).map(nameBy);
+  document.getElementById('swapOut').innerHTML = out.length ? out.map(n=>`<div class="namechip">${n}</div>`).join('') : '<div class="namechip">—</div>';
+  document.getElementById('swapIn').innerHTML  = inn.length ? inn.map(n=>`<div class="namechip">${n}</div>`).join('')  : '<div class="namechip">—</div>';
+  document.getElementById('swapOverlay').style.display = 'flex';
+  try{ navigator.vibrate && navigator.vibrate([120,80,120]); }catch(e){}
+}
+function hideSwap(){
+  document.getElementById('swapOverlay').style.display = 'none';
+  try{ navigator.vibrate && navigator.vibrate([60]); }catch(e){}
+}
 
-/* ===== NAV/EVENTS ===== */
-document.querySelectorAll('.tab button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id).classList.add('hidden')); const id=btn.dataset.tab==='setup'?'tab-setup':btn.dataset.tab==='live'?'tab-live':btn.dataset.tab==='quick'?'tab-quick':'tab-dist'; document.getElementById(id).classList.remove('hidden'); if(id==='tab-setup') renderSetup(); if(id==='tab-live'){state.viewQ=state.q; renderLive();} if(id==='tab-quick') renderQuick(); if(id==='tab-dist') renderDist();}));
-document.getElementById('btnAdd').addEventListener('click',()=>{state.players.push({id:uid(),name:'Nieuwe speler',pos:'Aanvaller',present:true,benchCd:0}); save(); renderPlayersList();});
-document.getElementById('btnReset').addEventListener('click',()=>{if(confirm('Team resetten naar vaste 8 spelers?')){state.players=DEFAULT_ORDER.map((n,i)=>({id:uid(),name:n,pos:POS[i%3],present:true,benchCd:0})); const ps=state.players.map(p=>p.id); state.keeperByQuarter=[ps[0],ps[1]||ps[0],ps[2]||ps[0],ps[3]||ps[0]]; recomputeAll(); document.querySelector('.tab button[data-tab="live"]').click(); renderLive();}});
-document.getElementById('keepersMode').addEventListener('change',()=>{state.keepersMode=Number(document.getElementById('keepersMode').value)||1; keeperAssignUI('keeperAssignRow','keepk'); save();});
-// 💾 Opslaan in Setup & naar Live
+/* ========== EVENTS ========== */
+// Tabs
+document.querySelectorAll('.tab button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ['tab-setup','tab-live','tab-quick','tab-dist'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+    const id = btn.dataset.tab==='setup' ? 'tab-setup'
+            : btn.dataset.tab==='live'  ? 'tab-live'
+            : btn.dataset.tab==='quick' ? 'tab-quick'
+            : 'tab-dist';
+    document.getElementById(id).classList.remove('hidden');
+    if(id==='tab-setup') renderSetup();
+    if(id==='tab-live')  renderLive();
+    if(id==='tab-quick') renderQuick();
+    if(id==='tab-dist')  renderDist();
+  });
+});
+
+// Setup-knoppen
+document.getElementById('btnAdd').addEventListener('click', ()=>{
+  state.players.push({ id:uid(), name:'Nieuwe speler', pos:'Aanvaller', present:true, benchCd:0 });
+  save(); renderPlayersList();
+});
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(!confirm('Team resetten naar vaste 8 spelers?')) return;
+  state.players = DEFAULT_ORDER.map((n,i)=>({ id:uid(), name:n, pos:POS[i%3], present:true, benchCd:0 }));
+  const ps = state.players.map(p=>p.id);
+  state.keeperByQuarter = [ps[0], ps[1]||ps[0], ps[2]||ps[0], ps[3]||ps[0]];
+  recomputeAll();
+  document.querySelector('.tab button[data-tab="live"]').click();
+  renderLive();
+});
+document.getElementById('keepersMode').addEventListener('change', ()=>{
+  state.keepersMode = Number(document.getElementById('keepersMode').value) || 1;
+  keeperAssignUI('keeperAssignRow','keepk');
+  save();
+});
 document.getElementById('btnSaveSetup').addEventListener('click', ()=>{
   state.team = document.getElementById('teamName').value.trim() || 'Team';
   state.formation = Number(document.getElementById('formation').value) || 5;
   state.keepersMode = Number(document.getElementById('keepersMode').value) || 1;
-  readKeeperAssign('keepk');         // Lees keeperkeuzes uit Setup-tab
-  recomputeAll();                    // Herbereken alles
-  renderLive();                      // Update Live
-  renderDist();                      // ✅ Voeg toe — direct ook Verdeling updaten
-  document.querySelector('.tab button[data-tab="live"]').click(); // Ga naar Live
+  readKeeperAssign('keepk');        // lees keeperkeuzes uit Setup
+  recomputeAll();                   // plan alles opnieuw
+  renderLive();
+  renderDist();
+  document.querySelector('.tab button[data-tab="live"]').click();
 });
 
-// 🔄 Herberekenen in tab Snelle wijzigingen
+// Snelle wijzigingen – herberekenen
 document.getElementById('btnQuickRecalc').addEventListener('click', ()=>{
   state.formation = Number(document.getElementById('quickFormation').value) || state.formation;
-  readKeeperAssign('quickk');        // Lees keeperwijzigingen uit Snelle Wijzigingen
-  recomputeAll();                    // Herbereken alles vanaf nul (met actuele spelers)
-  renderLive();                      // Update Live-tab
-  renderDist();                      // ✅ Update Verdeling-tab
-  populateManualSwapUI();            // ✅ Ververs ook dropdowns in Snelle Wijzigingen
-  document.querySelector('.tab button[data-tab="live"]').click(); // Ga naar Live-tab
+  readKeeperAssign('quickk');       // lees keeperkeuzes uit Snelle wijzigingen
+  recomputeAll();                   // geheel opnieuw plannen
+  renderLive();
+  renderDist();
+  populateManualSwapUI();
+  document.querySelector('.tab button[data-tab="live"]').click();
+});
+document.getElementById('btnQuickToLive').addEventListener('click', ()=>{
+  document.querySelector('.tab button[data-tab="live"]').click();
+  renderLive();
 });
 
-document.getElementById('btnQuickToLive').addEventListener('click',()=>{document.querySelector('.tab button[data-tab="live"]').click(); state.viewQ=state.q; renderLive();});
+// Handmatige wissel (alleen huidig kwart), daarna herverdeel hele wedstrijd
+function applyManualSwapForCurrentQuarter(){
+  const r1 = state.schedule.find(r=>r.q===state.q && r.slot===1);
+  const r2 = state.schedule.find(r=>r.q===state.q && r.slot===2);
+  if(!r1 || !r2) return;
 
-document.getElementById('btnStart').addEventListener('click',start);
-document.getElementById('btnPause').addEventListener('click',pause);
-document.getElementById('btnDidSwap').addEventListener('click',()=>{hideSwap();});
+  const outId = document.getElementById('manualOut').value;
+  const inId  = document.getElementById('manualIn').value;
+  if(!outId || !inId || outId === inId) return;
 
-/* BOOT */
-load(); ensureDefaults(); recomputeAll(); renderSetup();
+  // Bouw slot-2 veld o.b.v. slot-1 met de handmatige swap
+  const newField = r1.field.map(id => id===outId ? inId : id);
+  const all = presentPlayers().map(p=>p.id).filter(id=>id!==r1.keeper);
+  const newBench = all.filter(id=>!newField.includes(id));
+
+  const forcedS2 = {
+    start: 5, end: 10,
+    field: newField, bench: newBench,
+    out: [outId], inn: [inId]
+  };
+
+  // Rebuild vanaf huidig kwart en herverdeel rest van wedstrijd
+  rebuildScheduleFromQuarter(state.q, forcedS2);
+
+  // UI bijwerken
+  renderLive();
+  renderDist();
+  populateManualSwapUI();
+}
+document.getElementById('btnApplyManualSwap').addEventListener('click', applyManualSwapForCurrentQuarter);
+
+// Timer
+document.getElementById('btnStart').addEventListener('click', start);
+document.getElementById('btnPause').addEventListener('click', pause);
+
+// Overlay button
+document.getElementById('btnDidSwap').addEventListener('click', hideSwap);
+
+/* ========== INIT ========== */
+load();
+ensureDefaults();
+recomputeAll();
+renderSetup();
 </script>
 </body>
 </html>
