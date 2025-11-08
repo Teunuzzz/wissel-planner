@@ -98,6 +98,17 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
 .col-field{background:rgba(246,197,0,.1);border:1px solid var(--accent)}
 .col-bench{background:rgba(10,19,36,.8);border:1px solid var(--border)}
 
+  <div class="row" id="slotViewRow" style="margin:0 0 8px 0; gap:16px">
+  <label style="display:flex;align-items:center;gap:6px">
+    <input type="radio" name="slotView" value="1" checked>
+    Toon huidig (00–05)
+  </label>
+  <label style="display:flex;align-items:center;gap:6px">
+    <input type="radio" name="slotView" value="2">
+    Toon na wissel (05–10)
+  </label>
+</div>
+  
 /* Snelle wijz. – twee kolommen */
 .quick-cols{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:560px){.quick-cols{grid-template-columns:1fr 1fr}}
@@ -279,6 +290,7 @@ const POS = ['Aanvaller','Middenvelder','Verdediger'];
 const DEFAULT_ORDER = ['Dani','Twan','Sydney','Ryan','Finn','Milan','Diede','Wouter'];
 
 let state = {
+  slotView: 1, // 1 = slot-1 (00–05), 2 = slot-2 (05–10)
   quickSwapOut: null,      // id veld -> naar bank
   quickSwapIn:  null,      // id bank -> naar veld
   team: 'De Esch O9',
@@ -620,29 +632,30 @@ function renderDist(){
 /* ---------- Snelle wissel – chips ---------- */
 function renderQuickSwapCols(){
   const { r1, r2 } = currentSlots();
-  const fieldBox=document.getElementById('quickFieldChips');
-  const benchBox=document.getElementById('quickBenchChips');
+  const fieldBox = document.getElementById('quickFieldChips');
+  const benchBox = document.getElementById('quickBenchChips');
   if(!r1 || !r2 || !fieldBox || !benchBox) return;
 
-  // Default alleen als niets geselecteerd is:
-  if(state.quickSwapOut === null) state.quickSwapOut = r1.field[0] || null;
-  if(state.quickSwapIn  === null) state.quickSwapIn  = r1.bench[0] || null;
+  // Kies basis op basis van slotView
+  const baseField = (state.slotView === 2 ? r2.field : r1.field);
+  const baseBench = (state.slotView === 2 ? r2.bench : r1.bench);
 
-  fieldBox.innerHTML = r1.field.map(id=>{
-    const staged = (id===state.quickSwapOut) ? ' staged' : '';
-    return `<div class="chip${staged}" data-id="${id}" data-where="field">
-              <div class="who">${nameBy(id)}</div>
-              <div class="act"><button class="btn-move btn-to-bench" data-action="toBench">→ bank</button></div>
-            </div>`;
-  }).join('');
+  // Defaults voor selectie alleen afleiden uit het 'huidige' slot (slot-1),
+  // zodat OUT altijd iemand van het veld is en IN iemand van de bank van r1.
+  if(!r1.field.includes(state.quickSwapOut))  state.quickSwapOut = r1.field[0] || null;
+  if(!r1.bench.includes(state.quickSwapIn))   state.quickSwapIn  = r1.bench[0] || null;
 
-  benchBox.innerHTML = r1.bench.map(id=>{
-    const staged = (id===state.quickSwapIn) ? ' staged' : '';
-    return `<div class="chip${staged}" data-id="${id}" data-where="bench">
-              <div class="who">${nameBy(id)}</div>
-              <div class="act"><button class="btn-move btn-to-field" data-action="toField">→ veld</button></div>
-            </div>`;
-  }).join('');
+  fieldBox.innerHTML = baseField.map(id => `
+    <div class="chip${id===state.quickSwapOut?' staged':''}" data-id="${id}" data-where="field">
+      <div class="who">${nameBy(id)}</div>
+      <div class="act"><button class="btn-move btn-to-bench" data-action="toBench">→ bank</button></div>
+    </div>`).join('');
+
+  benchBox.innerHTML = baseBench.map(id => `
+    <div class="chip${id===state.quickSwapIn?' staged':''}" data-id="${id}" data-where="bench">
+      <div class="who">${nameBy(id)}</div>
+      <div class="act"><button class="btn-move btn-to-field" data-action="toField">→ veld</button></div>
+    </div>`).join('');
 }
 
 /* Eén handler: klik op chip OF op knopje werkt */
@@ -711,6 +724,14 @@ function hideSwap(){ const ov=document.getElementById('swapOverlay'); if(ov) ov.
 /* =====================  EVENTS (compact & robuust)  ===================== */
 
 // 1) Alle klik-acties via één gedelegeerde listener
+document.addEventListener('change', (e)=>{
+  if(e.target.name === 'slotView'){
+    state.slotView = Number(e.target.value) || 1;
+    renderQuickSwapCols();
+  }
+  // ... je had hier al keepersMode etc.
+});
+  
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('button, .btn-move'); // knoppen & chip-acties
   if (!btn) return;
@@ -852,6 +873,14 @@ document.addEventListener('change', (e) => {
     save();
   }
 });
+document.getElementById('btnApplyManualSwap')?.addEventListener('click', ()=>{
+  // ... jouw bestaande wisselcode
+  state.slotView = 2;
+  const radio = document.querySelector('input[name="slotView"][value="2"]');
+  if(radio) radio.checked = true;
+  renderQuickSwapCols();
+});
+  
 
 /* ---------- INIT ---------- */
 load(); ensureDefaults(); recomputeAll(); renderSetup(); updateTimerUI();
