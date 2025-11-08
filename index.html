@@ -519,15 +519,19 @@ function renderDist(){
   });
 }
 
-  function renderQuickSwapCols(){
-  const {r1, r2} = currentSlots();
+function renderQuickSwapCols(){
+  const { r1, r2 } = currentSlots();
   const fieldBox = document.getElementById('quickFieldChips');
   const benchBox = document.getElementById('quickBenchChips');
   if(!r1 || !r2 || !fieldBox || !benchBox) return;
 
-  // defaults (gebruik geplande out/inn of eerste van lijsten)
-  if(!state.quickSwapOut) state.quickSwapOut = (r2.out && r2.out[0]) || r1.field[0] || null;
-  if(!state.quickSwapIn)  state.quickSwapIn  = (r2.inn && r2.inn[0]) || r1.bench[0] || null;
+  // Zorg dat staged ids geldig zijn; zo niet, pak een default
+  if(!r1.field.includes(state.quickSwapOut)){
+    state.quickSwapOut = r1.field[0] || null;
+  }
+  if(!r1.bench.includes(state.quickSwapIn)){
+    state.quickSwapIn = r1.bench[0] || null;
+  }
 
   // veldchips
   fieldBox.innerHTML = r1.field.map(id => {
@@ -541,7 +545,7 @@ function renderDist(){
       </div>`;
   }).join('');
 
-  // benchchips
+  // bankchips
   benchBox.innerHTML = r1.bench.map(id => {
     const staged = (id === state.quickSwapIn) ? ' staged' : '';
     return `
@@ -553,6 +557,38 @@ function renderDist(){
       </div>`;
   }).join('');
 }
+
+// --- NIEUW: gedelegeerde click-handler voor de chips ---
+(function bindQuickSwapHandlers(){
+  const container = document.getElementById('quickSwapCols');
+  if(!container) return;
+
+  container.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.btn-move');
+    if(!btn) return;
+
+    const chip = e.target.closest('.chip');
+    const id   = chip?.getAttribute('data-id');
+    const where= chip?.getAttribute('data-where');   // 'field' of 'bench'
+    const act  = btn.getAttribute('data-action');     // 'toBench' of 'toField'
+    if(!id || !where || !act) return;
+
+    if(where === 'field' && act === 'toBench'){
+      // kies wie er VAN het veld gaat (uit)
+      state.quickSwapOut = id;
+      save();
+      renderQuickSwapCols(); // highlight updaten
+      return;
+    }
+    if(where === 'bench' && act === 'toField'){
+      // kies wie er VAN de bank komt (in)
+      state.quickSwapIn = id;
+      save();
+      renderQuickSwapCols(); // highlight updaten
+      return;
+    }
+  });
+})();
 
 
 /* ========== TIMER/PROGRESS/OVERLAY ========== */
