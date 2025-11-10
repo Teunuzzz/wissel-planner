@@ -188,9 +188,11 @@ input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--b
   <!-- TAB: Live -->
   <section id="tab-live" class="card hidden">
     <h2>Live wedstrijd</h2>
-    <div class="row" style="gap:8px;flex-wrap:wrap">
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
   <button class="btn" id="btnStart">▶ Start</button>
   <button class="btn secondary" id="btnPause">⏸ Pauze</button>
+  <span style="flex:1"></span> <!-- extra ruimte -->
+  <button class="btn danger small" id="btnResetClock" style="opacity:0.9">🔄 Reset klok</button>
 </div>
     <div class="card" id="liveSwapCard">
       <h3>Wissel bij 05:00</h3>
@@ -745,6 +747,38 @@ function showSwap(){
   const ov=document.getElementById('swapOverlay'); if(ov) ov.style.display='flex';
   try{ navigator.vibrate && navigator.vibrate([120,80,120]); }catch(e){}
 }
+
+function resetClock(){
+  // klok stoppen
+  pause();
+
+  // hele wedstrijd terug naar start (kwart 1 • slot 1)
+  state.q = 1;                    // terug naar kwart 1
+  state.elapsedMs = 0;            // 10:00 op de klok
+  state.swappedThisQuarter = false;
+  state.slotView = 1;             // “toon huidig (00–05)”
+
+  // (optioneel maar aan te raden) schema eerlijk opnieuw opbouwen
+  // zodat eventuele eerdere herverdelingen/benchCd’s niet doorwerken
+  recomputeAll();
+
+  // UI bijwerken
+  // radio “slotView” mee terugzetten als die bestaat
+  const r = document.querySelector('input[name="slotView"][value="1"]');
+  if (r) r.checked = true;
+
+  // overlay dicht, voor de zekerheid
+  const ov = document.getElementById('swapOverlay');
+  if (ov) ov.style.display = 'none';
+
+  renderLive();       // vult keeper/veld/bank en tabel (1•1 en 1•2)
+  renderDist();       // optioneel: verdeling opnieuw tonen
+  renderQuick();      // snelle-wijzigingen-chips en selectie syncen
+  updateTimerUI();    // klok + voortgangsbalk terug naar begin
+  save();
+}
+  
+  
 function hideSwap(){ const ov=document.getElementById('swapOverlay'); if(ov) ov.style.display='none'; try{ navigator.vibrate && navigator.vibrate([60]); }catch(e){} }
 
 /* ---------- EVENTS ---------- */
@@ -789,6 +823,11 @@ document.addEventListener('click', (e) => {
   if (btn.id === 'btnStart') { start(); return; }
   if (btn.id === 'btnPause') { pause(); return; }
   if (btn.id === 'btnDidSwap') { hideSwap(); return; }
+  if (btn.id === 'btnResetClock') {
+  if (!confirm('Klok resetten naar begin van huidig kwart?')) return;
+  resetClock();
+  return;
+}
 
   /* ---- Setup: spelers beheren ---- */
   if (btn.id === 'btnAdd') {
@@ -907,7 +946,6 @@ document.getElementById('btnApplyManualSwap')?.addEventListener('click', ()=>{
   if(radio) radio.checked = true;
   renderQuickSwapCols();
 });
-  
 
 /* ---------- INIT ---------- */
 load(); ensureDefaults(); recomputeAll(); renderSetup(); updateTimerUI();
